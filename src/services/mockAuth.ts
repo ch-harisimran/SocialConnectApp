@@ -8,6 +8,8 @@ export interface User {
   name: string;
   email: string;
   password: string;
+  bio: string;
+  avatar: string | null;
   createdAt: string;
 }
 
@@ -15,6 +17,8 @@ export interface AuthUser {
   id: string;
   name: string;
   email: string;
+  bio: string;
+  avatar: string | null;
 }
 
 const getUsers = async (): Promise<User[]> => {
@@ -39,11 +43,19 @@ export const mockAuth = {
       name,
       email: email.toLowerCase(),
       password,
+      bio: '',
+      avatar: null,
       createdAt: new Date().toISOString(),
     };
 
     await saveUsers([...users, newUser]);
-    const session: AuthUser = { id: newUser.id, name: newUser.name, email: newUser.email };
+    const session: AuthUser = {
+      id: newUser.id,
+      name: newUser.name,
+      email: newUser.email,
+      bio: newUser.bio,
+      avatar: newUser.avatar,
+    };
     await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
     return session;
   },
@@ -59,7 +71,38 @@ export const mockAuth = {
       throw new Error('Incorrect password. Please try again.');
     }
 
-    const session: AuthUser = { id: user.id, name: user.name, email: user.email };
+    const session: AuthUser = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      bio: user.bio,
+      avatar: user.avatar,
+    };
+    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
+    return session;
+  },
+
+  async updateProfile(
+    userId: string,
+    updates: { name: string; bio: string; avatar: string | null }
+  ): Promise<AuthUser> {
+    const users = await getUsers();
+    const index = users.findIndex(u => u.id === userId);
+    if (index === -1) {
+      throw new Error('User not found.');
+    }
+
+    users[index] = { ...users[index], ...updates };
+    await saveUsers(users);
+
+    const updated = users[index];
+    const session: AuthUser = {
+      id: updated.id,
+      name: updated.name,
+      email: updated.email,
+      bio: updated.bio,
+      avatar: updated.avatar,
+    };
     await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
     return session;
   },
@@ -70,7 +113,6 @@ export const mockAuth = {
     if (!user) {
       throw new Error('No account found with this email address.');
     }
-    // Simulate network delay for password reset email
     await new Promise(resolve => setTimeout(resolve, 800));
   },
 

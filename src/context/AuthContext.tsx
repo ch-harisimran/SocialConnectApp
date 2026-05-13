@@ -7,6 +7,7 @@ interface AuthContextType {
   signUp: (name: string, email: string, password: string) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateProfile: (updates: { name: string; bio: string; avatar: string | null }) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,8 +38,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setUser(null);
   };
 
+  const updateProfile = async (updates: { name: string; bio: string; avatar: string | null }) => {
+    if (!user) throw new Error('Not authenticated.');
+    const session = await mockAuth.updateProfile(user.id, updates);
+    setUser(session);
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isLoading, signUp, login, logout }}>
+    <AuthContext.Provider value={{ user, isLoading, signUp, login, logout, updateProfile }}>
       {children}
     </AuthContext.Provider>
   );
