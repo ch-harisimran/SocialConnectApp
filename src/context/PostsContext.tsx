@@ -1,6 +1,15 @@
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { mockPostsService, Post } from '../services/mockPosts';
-import { useAuth } from './AuthContext';
+import React, { createContext, useContext, useEffect } from 'react';
+import { Post } from '../services/mockPosts';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import {
+  fetchPosts,
+  refreshPosts as refreshPostsThunk,
+  createPost as createPostThunk,
+  toggleLike as toggleLikeThunk,
+  addComment as addCommentThunk,
+  deleteComment as deleteCommentThunk,
+  deletePost as deletePostThunk,
+} from '../store/slices/postsSlice';
 
 interface PostsContextType {
   posts: Post[];
@@ -17,70 +26,43 @@ interface PostsContextType {
 const PostsContext = createContext<PostsContextType | undefined>(undefined);
 
 export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const mountedRef = useRef(true);
+  const dispatch = useAppDispatch();
+  const posts = useAppSelector(state => state.posts.posts);
+  const isLoading = useAppSelector(state => state.posts.isLoading);
+  const isRefreshing = useAppSelector(state => state.posts.isRefreshing);
 
   useEffect(() => {
-    mountedRef.current = true;
-    mockPostsService.fetchPosts().then(fetched => {
-      if (mountedRef.current) {
-        setPosts(fetched);
-        setIsLoading(false);
-      }
-    });
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+    dispatch(fetchPosts());
+  }, [dispatch]);
 
   const refreshPosts = async () => {
-    setIsRefreshing(true);
-    const fetched = await mockPostsService.fetchPosts();
-    setPosts(fetched);
-    setIsRefreshing(false);
+    await dispatch(refreshPostsThunk());
   };
 
   const createPost = async (content: string, imageUri: string | null) => {
-    if (!user) throw new Error('Not authenticated.');
-    const newPost = await mockPostsService.createPost({
-      authorId: user.id,
-      authorName: user.name,
-      authorAvatar: user.avatar,
-      content,
-      imageUri,
-    });
-    setPosts(prev => [newPost, ...prev]);
+    const result = await dispatch(createPostThunk({ content, imageUri }));
+    if (createPostThunk.rejected.match(result)) {
+      throw new Error(result.error.message ?? 'Failed to create post.');
+    }
   };
 
   const toggleLike = async (postId: string) => {
-    if (!user) return;
-    const updated = await mockPostsService.toggleLike(postId, user.id);
-    setPosts(prev => prev.map(p => (p.id === postId ? updated : p)));
+    await dispatch(toggleLikeThunk(postId));
   };
 
   const addComment = async (postId: string, text: string) => {
-    if (!user) throw new Error('Not authenticated.');
-    const updated = await mockPostsService.addComment(
-      postId,
-      { id: user.id, name: user.name, avatar: user.avatar },
-      text
-    );
-    setPosts(prev => prev.map(p => (p.id === postId ? updated : p)));
+    const result = await dispatch(addCommentThunk({ postId, text }));
+    if (addCommentThunk.rejected.match(result)) {
+      throw new Error(result.error.message ?? 'Failed to add comment.');
+    }
   };
 
   const deleteComment = async (postId: string, commentId: string) => {
-    if (!user) return;
-    const updated = await mockPostsService.deleteComment(postId, commentId, user.id);
-    setPosts(prev => prev.map(p => (p.id === postId ? updated : p)));
+    await dispatch(deleteCommentThunk({ postId, commentId }));
   };
 
   const deletePost = async (postId: string) => {
-    if (!user) return;
-    await mockPostsService.deletePost(postId, user.id);
-    setPosts(prev => prev.filter(p => p.id !== postId));
+    await dispatch(deletePostThunk(postId));
   };
 
   return (

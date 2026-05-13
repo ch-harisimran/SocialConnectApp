@@ -1,5 +1,13 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { mockAuth, AuthUser } from '../services/mockAuth';
+import React, { createContext, useContext, useEffect } from 'react';
+import { AuthUser } from '../services/mockAuth';
+import { useAppDispatch, useAppSelector } from '../store/hooks';
+import {
+  loadSession,
+  login as loginThunk,
+  signUp as signUpThunk,
+  logout as logoutThunk,
+  updateProfile as updateProfileThunk,
+} from '../store/slices/authSlice';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -13,35 +21,38 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const dispatch = useAppDispatch();
+  const user = useAppSelector(state => state.auth.user);
+  const isLoading = useAppSelector(state => state.auth.isLoading);
 
   useEffect(() => {
-    mockAuth.getSession().then(session => {
-      setUser(session);
-      setIsLoading(false);
-    });
-  }, []);
+    dispatch(loadSession());
+  }, [dispatch]);
 
   const signUp = async (name: string, email: string, password: string) => {
-    const session = await mockAuth.signUp(name, email, password);
-    setUser(session);
+    const result = await dispatch(signUpThunk({ name, email, password }));
+    if (signUpThunk.rejected.match(result)) {
+      throw new Error(result.error.message ?? 'Sign up failed.');
+    }
   };
 
   const login = async (email: string, password: string) => {
-    const session = await mockAuth.login(email, password);
-    setUser(session);
+    const result = await dispatch(loginThunk({ email, password }));
+    if (loginThunk.rejected.match(result)) {
+      throw new Error(result.error.message ?? 'Login failed.');
+    }
   };
 
   const logout = async () => {
-    await mockAuth.logout();
-    setUser(null);
+    await dispatch(logoutThunk());
   };
 
   const updateProfile = async (updates: { name: string; bio: string; avatar: string | null }) => {
     if (!user) throw new Error('Not authenticated.');
-    const session = await mockAuth.updateProfile(user.id, updates);
-    setUser(session);
+    const result = await dispatch(updateProfileThunk({ userId: user.id, updates }));
+    if (updateProfileThunk.rejected.match(result)) {
+      throw new Error(result.error.message ?? 'Update failed.');
+    }
   };
 
   return (
