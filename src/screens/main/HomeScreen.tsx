@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  Animated,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -19,6 +20,87 @@ import { Post } from '../../services/mockPosts';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'Home'>;
+
+// ─── LiveBadge ────────────────────────────────────────────────────────────────
+
+const LiveBadge: React.FC<{ lastSyncedAt: number | null }> = ({ lastSyncedAt }) => {
+  const [pulse] = useState(() => new Animated.Value(1));
+  const [, tick] = useState(0);
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.3, duration: 900, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
+      ])
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [pulse]);
+
+  // Re-render every 30s so the "updated X ago" text stays fresh
+  useEffect(() => {
+    const interval = setInterval(() => tick(n => n + 1), 30_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const timeLabel = lastSyncedAt ? formatTimeAgo(new Date(lastSyncedAt).toISOString()) : null;
+
+  return (
+    <View style={liveBadgeStyles.container}>
+      <Animated.View style={[liveBadgeStyles.dot, { opacity: pulse }]} />
+      <Text style={liveBadgeStyles.text}>LIVE{timeLabel ? ` · ${timeLabel}` : ''}</Text>
+    </View>
+  );
+};
+
+const liveBadgeStyles = StyleSheet.create({
+  container: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  dot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#22C55E' },
+  text: { fontSize: 11, fontWeight: '700', color: '#22C55E', letterSpacing: 0.4 },
+});
+
+// ─── NewActivityBanner ────────────────────────────────────────────────────────
+
+const NewActivityBanner: React.FC<{ onPress: () => void }> = ({ onPress }) => {
+  const [slideY] = useState(() => new Animated.Value(-40));
+
+  useEffect(() => {
+    Animated.spring(slideY, {
+      toValue: 0,
+      useNativeDriver: true,
+      tension: 80,
+      friction: 10,
+    }).start();
+  }, [slideY]);
+
+  return (
+    <Animated.View style={[bannerStyles.wrapper, { transform: [{ translateY: slideY }] }]}>
+      <TouchableOpacity style={bannerStyles.banner} onPress={onPress} activeOpacity={0.85}>
+        <Text style={bannerStyles.text}>✦ New activity — tap to refresh</Text>
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+const bannerStyles = StyleSheet.create({
+  wrapper: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, alignItems: 'center' },
+  banner: {
+    marginTop: 8,
+    backgroundColor: '#6366F1',
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 20,
+    elevation: 4,
+    shadowColor: '#6366F1',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+  },
+  text: { color: '#fff', fontWeight: '700', fontSize: 13 },
+});
+
+// ─── PostCard ─────────────────────────────────────────────────────────────────
 
 const PostCard: React.FC<{
   post: Post;
@@ -113,10 +195,24 @@ const EmptyFeed: React.FC<{ onCreatePost: () => void }> = ({ onCreatePost }) => 
   </View>
 );
 
+// ─── HomeScreen ───────────────────────────────────────────────────────────────
+
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
-  const { posts, isLoading, isRefreshing, refreshPosts, toggleLike, deletePost } = usePosts();
+  const {
+    posts,
+    isLoading,
+    isRefreshing,
+    lastSyncedAt,
+    hasNewActivity,
+    refreshPosts,
+    clearNewActivity,
+    toggleLike,
+    deletePost,
+  } = usePosts();
+
+  const listRef = useRef<FlatList>(null);
 
   const handleLike = useCallback((id: string) => toggleLike(id), [toggleLike]);
   const handleDelete = useCallback((id: string) => deletePost(id), [deletePost]);
@@ -130,6 +226,11 @@ const HomeScreen: React.FC = () => {
     [navigation]
   );
   const handleCreatePost = useCallback(() => navigation.navigate('CreatePost'), [navigation]);
+
+  const handleNewActivityPress = useCallback(() => {
+    listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    clearNewActivity();
+  }, [clearNewActivity]);
 
   const initials = user?.name?.slice(0, 2).toUpperCase() ?? 'U';
 
@@ -145,6 +246,7 @@ const HomeScreen: React.FC = () => {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.headerTitle}>Social Connect</Text>
+        <LiveBadge lastSyncedAt={lastSyncedAt} />
         {user?.avatar ? (
           <Image source={{ uri: user.avatar }} style={styles.headerAvatar} />
         ) : (
@@ -155,6 +257,7 @@ const HomeScreen: React.FC = () => {
       </View>
 
       <FlatList
+        ref={listRef}
         data={posts}
         keyExtractor={item => item.id}
         renderItem={({ item }) => (
@@ -198,6 +301,8 @@ const HomeScreen: React.FC = () => {
           />
         }
       />
+
+      {hasNewActivity && <NewActivityBanner onPress={handleNewActivityPress} />}
 
       <TouchableOpacity style={styles.fab} onPress={handleCreatePost} activeOpacity={0.85}>
         <Text style={styles.fabIcon}>+</Text>

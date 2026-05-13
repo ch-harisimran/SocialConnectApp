@@ -7,12 +7,16 @@ interface PostsState {
   posts: Post[];
   isLoading: boolean;
   isRefreshing: boolean;
+  lastSyncedAt: number | null;
+  hasNewActivity: boolean;
 }
 
 const initialState: PostsState = {
   posts: [],
   isLoading: true,
   isRefreshing: false,
+  lastSyncedAt: null,
+  hasNewActivity: false,
 };
 
 export const fetchPosts = createAsyncThunk('posts/fetchPosts', async () => {
@@ -105,22 +109,40 @@ export const deletePost = createAsyncThunk(
   }
 );
 
+function detectNewActivity(current: Post[], incoming: Post[]): boolean {
+  for (const next of incoming) {
+    const prev = current.find(p => p.id === next.id);
+    if (!prev) return true; // brand-new post
+    if (next.likes.length !== prev.likes.length) return true;
+    if (next.comments.length !== prev.comments.length) return true;
+  }
+  return false;
+}
+
 const postsSlice = createSlice({
   name: 'posts',
   initialState,
-  reducers: {},
+  reducers: {
+    clearNewActivity(state) {
+      state.hasNewActivity = false;
+    },
+  },
   extraReducers: builder => {
     builder
       .addCase(fetchPosts.fulfilled, (state, action) => {
         state.posts = action.payload;
         state.isLoading = false;
+        state.lastSyncedAt = Date.now();
       })
       .addCase(refreshPosts.pending, state => {
         state.isRefreshing = true;
       })
       .addCase(refreshPosts.fulfilled, (state, action) => {
+        const activity = detectNewActivity(state.posts, action.payload);
         state.posts = action.payload;
         state.isRefreshing = false;
+        state.lastSyncedAt = Date.now();
+        if (activity) state.hasNewActivity = true;
       })
       .addCase(refreshPosts.rejected, state => {
         state.isRefreshing = false;
@@ -146,4 +168,5 @@ const postsSlice = createSlice({
   },
 });
 
+export const { clearNewActivity } = postsSlice.actions;
 export default postsSlice.reducer;

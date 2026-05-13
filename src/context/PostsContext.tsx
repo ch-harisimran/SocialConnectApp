@@ -9,13 +9,17 @@ import {
   addComment as addCommentThunk,
   deleteComment as deleteCommentThunk,
   deletePost as deletePostThunk,
+  clearNewActivity as clearNewActivityAction,
 } from '../store/slices/postsSlice';
 
 interface PostsContextType {
   posts: Post[];
   isLoading: boolean;
   isRefreshing: boolean;
+  lastSyncedAt: number | null;
+  hasNewActivity: boolean;
   refreshPosts: () => Promise<void>;
+  clearNewActivity: () => void;
   createPost: (content: string, imageUri: string | null) => Promise<void>;
   toggleLike: (postId: string) => Promise<void>;
   addComment: (postId: string, text: string) => Promise<void>;
@@ -30,6 +34,8 @@ export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const posts = useAppSelector(state => state.posts.posts);
   const isLoading = useAppSelector(state => state.posts.isLoading);
   const isRefreshing = useAppSelector(state => state.posts.isRefreshing);
+  const lastSyncedAt = useAppSelector(state => state.posts.lastSyncedAt);
+  const hasNewActivity = useAppSelector(state => state.posts.hasNewActivity);
 
   useEffect(() => {
     dispatch(fetchPosts());
@@ -37,6 +43,10 @@ export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const refreshPosts = async () => {
     await dispatch(refreshPostsThunk());
+  };
+
+  const clearNewActivity = () => {
+    dispatch(clearNewActivityAction());
   };
 
   const createPost = async (content: string, imageUri: string | null) => {
@@ -71,7 +81,10 @@ export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         posts,
         isLoading,
         isRefreshing,
+        lastSyncedAt,
+        hasNewActivity,
         refreshPosts,
+        clearNewActivity,
         createPost,
         toggleLike,
         addComment,

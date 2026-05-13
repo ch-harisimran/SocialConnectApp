@@ -11,6 +11,7 @@ import RootNavigator from './src/navigation/RootNavigator';
 import { useAppDispatch } from './src/store/hooks';
 import { loadSettings } from './src/store/slices/settingsSlice';
 import { notificationService } from './src/services/notificationService';
+import RealtimeSyncManager from './src/components/RealtimeSyncManager';
 
 const AppInitializer: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -28,6 +29,7 @@ export default function App() {
     <GestureHandlerRootView style={styles.root}>
       <Provider store={store}>
         <AppInitializer />
+        <RealtimeSyncManager />
         <AuthProvider>
           <PostsProvider>
             <NavigationContainer>
