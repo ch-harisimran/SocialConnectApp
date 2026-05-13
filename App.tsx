@@ -17,6 +17,7 @@ const AppInitializer: React.FC = () => {
   const dispatch = useAppDispatch();
 
   useEffect(() => {
+    notificationService.setup();
     dispatch(loadSettings());
     notificationService.requestPermissions();
   }, [dispatch]);

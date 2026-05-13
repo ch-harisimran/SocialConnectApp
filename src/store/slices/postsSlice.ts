@@ -1,7 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { mockPostsService, Post } from '../../services/mockPosts';
 import { notificationService } from '../../services/notificationService';
-import { RootState } from '../index';
+import type { RootState } from '../index';
 
 interface PostsState {
   posts: Post[];
@@ -9,6 +9,7 @@ interface PostsState {
   isRefreshing: boolean;
   lastSyncedAt: number | null;
   hasNewActivity: boolean;
+  error: string | null;
 }
 
 const initialState: PostsState = {
@@ -17,6 +18,7 @@ const initialState: PostsState = {
   isRefreshing: false,
   lastSyncedAt: null,
   hasNewActivity: false,
+  error: null,
 };
 
 export const fetchPosts = createAsyncThunk('posts/fetchPosts', async () => {
@@ -112,7 +114,7 @@ export const deletePost = createAsyncThunk(
 function detectNewActivity(current: Post[], incoming: Post[]): boolean {
   for (const next of incoming) {
     const prev = current.find(p => p.id === next.id);
-    if (!prev) return true; // brand-new post
+    if (!prev) return true;
     if (next.likes.length !== prev.likes.length) return true;
     if (next.comments.length !== prev.comments.length) return true;
   }
@@ -132,7 +134,12 @@ const postsSlice = createSlice({
       .addCase(fetchPosts.fulfilled, (state, action) => {
         state.posts = action.payload;
         state.isLoading = false;
+        state.error = null;
         state.lastSyncedAt = Date.now();
+      })
+      .addCase(fetchPosts.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.error.message ?? 'Failed to load posts.';
       })
       .addCase(refreshPosts.pending, state => {
         state.isRefreshing = true;

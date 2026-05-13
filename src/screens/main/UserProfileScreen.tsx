@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { memo, useEffect, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -27,7 +27,7 @@ interface PublicProfile {
   avatar: string | null;
 }
 
-const PostTile: React.FC<{ post: Post; onPress: () => void }> = ({ post, onPress }) => (
+const PostTile: React.FC<{ post: Post; onPress: () => void }> = memo(({ post, onPress }) => (
   <TouchableOpacity style={styles.postCard} onPress={onPress} activeOpacity={0.85}>
     <Text style={styles.postContent} numberOfLines={3}>
       {post.content}
@@ -43,7 +43,8 @@ const PostTile: React.FC<{ post: Post; onPress: () => void }> = ({ post, onPress
       </View>
     </View>
   </TouchableOpacity>
-);
+));
+PostTile.displayName = 'PostTile';
 
 const UserProfileScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -58,7 +59,7 @@ const UserProfileScreen: React.FC = () => {
   const [isFollowing, setIsFollowing] = useState(false);
 
   const isOwnProfile = currentUser?.id === userId;
-  const userPosts = posts.filter(p => p.authorId === userId);
+  const userPosts = useMemo(() => posts.filter(p => p.authorId === userId), [posts, userId]);
 
   useEffect(() => {
     mockAuth.getPublicProfile(userId).then(data => {
@@ -95,6 +96,10 @@ const UserProfileScreen: React.FC = () => {
       data={userPosts}
       keyExtractor={item => item.id}
       showsVerticalScrollIndicator={false}
+      removeClippedSubviews
+      maxToRenderPerBatch={8}
+      initialNumToRender={6}
+      windowSize={10}
       contentContainerStyle={styles.listContent}
       ListHeaderComponent={
         <>

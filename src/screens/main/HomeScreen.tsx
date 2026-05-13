@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -24,6 +24,8 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { usePosts } from '../../context/PostsContext';
 import { useAuth } from '../../context/AuthContext';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { clearNewActivity } from '../../store/slices/postsSlice';
 import { formatTimeAgo } from '../../utils/formatTime';
 import { rf, rw, rh } from '../../utils/responsive';
 import { Post } from '../../services/mockPosts';
@@ -108,7 +110,7 @@ const bannerStyles = StyleSheet.create({
 
 // ─── PostCard ─────────────────────────────────────────────────────────────────
 
-const PostCard: React.FC<{
+interface PostCardProps {
   post: Post;
   index: number;
   currentUserId: string;
@@ -116,95 +118,107 @@ const PostCard: React.FC<{
   onComment: (id: string) => void;
   onDelete: (id: string) => void;
   onViewProfile: (authorId: string, authorName: string) => void;
-}> = ({ post, index, currentUserId, onLike, onComment, onDelete, onViewProfile }) => {
-  const liked = post.likes.includes(currentUserId);
-  const isOwner = post.authorId === currentUserId;
-  const initials = post.authorName.slice(0, 2).toUpperCase();
+}
 
-  // Staggered entrance animation (first 6 items only)
-  const opacity = useSharedValue(index < 6 ? 0 : 1);
-  const translateY = useSharedValue(index < 6 ? 24 : 0);
+const PostCard = memo<PostCardProps>(
+  ({ post, index, currentUserId, onLike, onComment, onDelete, onViewProfile }) => {
+    const liked = post.likes.includes(currentUserId);
+    const isOwner = post.authorId === currentUserId;
+    const initials = post.authorName.slice(0, 2).toUpperCase();
 
-  useEffect(() => {
-    if (index < 6) {
-      const delay = index * 70;
-      opacity.value = withDelay(delay, withTiming(1, { duration: 280 }));
-      translateY.value = withDelay(delay, withSpring(0, { damping: 16 }));
-    }
-    // Run once on mount only
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Staggered entrance animation (first 6 items only)
+    const opacity = useSharedValue(index < 6 ? 0 : 1);
+    const translateY = useSharedValue(index < 6 ? 24 : 0);
 
-  const cardAnimStyle = useAnimatedStyle(() => ({
-    opacity: opacity.value,
-    transform: [{ translateY: translateY.value }],
-  }));
+    useEffect(() => {
+      if (index < 6) {
+        const delay = index * 70;
+        opacity.value = withDelay(delay, withTiming(1, { duration: 280 }));
+        translateY.value = withDelay(delay, withSpring(0, { damping: 16 }));
+      }
+      // Run once on mount only
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
-  const confirmDelete = () => {
-    Alert.alert('Delete post', 'Are you sure you want to delete this post?', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Delete', style: 'destructive', onPress: () => onDelete(post.id) },
-    ]);
-  };
+    const cardAnimStyle = useAnimatedStyle(() => ({
+      opacity: opacity.value,
+      transform: [{ translateY: translateY.value }],
+    }));
 
-  return (
-    <Animated.View style={[styles.card, cardAnimStyle]}>
-      <TouchableOpacity
-        style={styles.cardHeader}
-        onPress={() => onViewProfile(post.authorId, post.authorName)}
-        activeOpacity={0.7}
-      >
-        {post.authorAvatar ? (
-          <Image source={{ uri: post.authorAvatar }} style={styles.avatarImage} />
-        ) : (
-          <View style={styles.avatarCircle}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
-        )}
-        <View style={styles.authorInfo}>
-          <Text style={styles.authorName}>{post.authorName}</Text>
-          <Text style={styles.postTime}>{formatTimeAgo(post.createdAt)}</Text>
-        </View>
-        {isOwner && (
-          <TouchableOpacity
-            onPress={e => {
-              e.stopPropagation();
-              confirmDelete();
-            }}
-            style={styles.deleteBtn}
-            hitSlop={8}
-          >
-            <Text style={styles.deleteBtnText}>⋯</Text>
-          </TouchableOpacity>
-        )}
-      </TouchableOpacity>
+    const confirmDelete = () => {
+      Alert.alert('Delete post', 'Are you sure you want to delete this post?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: () => onDelete(post.id) },
+      ]);
+    };
 
-      <Text style={styles.postContent}>{post.content}</Text>
-
-      {post.imageUri ? (
-        <Image source={{ uri: post.imageUri }} style={styles.postImage} resizeMode="cover" />
-      ) : null}
-
-      <View style={styles.cardFooter}>
-        <AnimatedHeartButton
-          liked={liked}
-          count={post.likes.length}
-          onPress={() => onLike(post.id)}
-        />
+    return (
+      <Animated.View style={[styles.card, cardAnimStyle]}>
         <TouchableOpacity
-          style={styles.actionBtn}
-          onPress={() => onComment(post.id)}
+          style={styles.cardHeader}
+          onPress={() => onViewProfile(post.authorId, post.authorName)}
           activeOpacity={0.7}
         >
-          <Text style={styles.actionText}>💬 {post.comments.length}</Text>
+          {post.authorAvatar ? (
+            <Image source={{ uri: post.authorAvatar }} style={styles.avatarImage} />
+          ) : (
+            <View style={styles.avatarCircle}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
+          )}
+          <View style={styles.authorInfo}>
+            <Text style={styles.authorName}>{post.authorName}</Text>
+            <Text style={styles.postTime}>{formatTimeAgo(post.createdAt)}</Text>
+          </View>
+          {isOwner && (
+            <TouchableOpacity
+              onPress={e => {
+                e.stopPropagation();
+                confirmDelete();
+              }}
+              style={styles.deleteBtn}
+              hitSlop={8}
+            >
+              <Text style={styles.deleteBtnText}>⋯</Text>
+            </TouchableOpacity>
+          )}
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn}>
-          <Text style={styles.actionText}>↗ Share</Text>
-        </TouchableOpacity>
-      </View>
-    </Animated.View>
-  );
-};
+
+        <Text style={styles.postContent}>{post.content}</Text>
+
+        {post.imageUri ? (
+          <Image source={{ uri: post.imageUri }} style={styles.postImage} resizeMode="cover" />
+        ) : null}
+
+        <View style={styles.cardFooter}>
+          <AnimatedHeartButton
+            liked={liked}
+            count={post.likes.length}
+            onPress={() => onLike(post.id)}
+          />
+          <TouchableOpacity
+            style={styles.actionBtn}
+            onPress={() => onComment(post.id)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.actionText}>💬 {post.comments.length}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actionBtn}>
+            <Text style={styles.actionText}>↗ Share</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+    );
+  },
+  (prev, next) =>
+    prev.post === next.post &&
+    prev.currentUserId === next.currentUserId &&
+    prev.onLike === next.onLike &&
+    prev.onComment === next.onComment &&
+    prev.onDelete === next.onDelete &&
+    prev.onViewProfile === next.onViewProfile
+);
+PostCard.displayName = 'PostCard';
 
 const EmptyFeed: React.FC<{ onCreatePost: () => void }> = ({ onCreatePost }) => (
   <View style={styles.emptyContainer}>
@@ -222,17 +236,11 @@ const EmptyFeed: React.FC<{ onCreatePost: () => void }> = ({ onCreatePost }) => 
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
-  const {
-    posts,
-    isLoading,
-    isRefreshing,
-    lastSyncedAt,
-    hasNewActivity,
-    refreshPosts,
-    clearNewActivity,
-    toggleLike,
-    deletePost,
-  } = usePosts();
+  const { posts, isLoading, isRefreshing, refreshPosts, toggleLike, deletePost } = usePosts();
+  const dispatch = useAppDispatch();
+  const lastSyncedAt = useAppSelector(state => state.posts.lastSyncedAt);
+  const hasNewActivity = useAppSelector(state => state.posts.hasNewActivity);
+  const postsError = useAppSelector(state => state.posts.error);
 
   const listRef = useRef<FlatList>(null);
 
@@ -261,8 +269,8 @@ const HomeScreen: React.FC = () => {
 
   const handleNewActivityPress = useCallback(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
-    clearNewActivity();
-  }, [clearNewActivity]);
+    dispatch(clearNewActivity());
+  }, [dispatch]);
 
   const initials = user?.name?.slice(0, 2).toUpperCase() ?? 'U';
 
@@ -270,6 +278,17 @@ const HomeScreen: React.FC = () => {
     return (
       <View style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#6366F1" />
+      </View>
+    );
+  }
+
+  if (postsError && posts.length === 0) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.errorText}>{"Couldn't load posts.\nPull down to try again."}</Text>
+        <TouchableOpacity style={styles.retryBtn} onPress={refreshPosts} activeOpacity={0.8}>
+          <Text style={styles.retryBtnText}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -325,6 +344,10 @@ const HomeScreen: React.FC = () => {
         ListEmptyComponent={<EmptyFeed onCreatePost={handleCreatePost} />}
         contentContainerStyle={styles.feed}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews
+        maxToRenderPerBatch={5}
+        initialNumToRender={8}
+        windowSize={10}
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
@@ -354,6 +377,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#F3F4F6',
   },
+  errorText: {
+    fontSize: rf(1.7),
+    color: '#6B7280',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: rh(2.5),
+  },
+  retryBtn: {
+    backgroundColor: '#6366F1',
+    paddingVertical: rh(1.4),
+    paddingHorizontal: rw(8),
+    borderRadius: 24,
+  },
+  retryBtnText: { color: '#fff', fontWeight: '700', fontSize: rf(1.6) },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

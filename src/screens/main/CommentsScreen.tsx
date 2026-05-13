@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { memo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -24,12 +24,12 @@ import AnimatedHeartButton from '../../components/AnimatedHeartButton';
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'Comments'>;
 type Route = RouteProp<HomeStackParamList, 'Comments'>;
 
-const CommentItem: React.FC<{
+const CommentItem = memo<{
   comment: Comment;
   currentUserId: string;
   onDelete: (commentId: string) => void;
   onViewProfile: (authorId: string, authorName: string) => void;
-}> = ({ comment, currentUserId, onDelete, onViewProfile }) => {
+}>(({ comment, currentUserId, onDelete, onViewProfile }) => {
   const isOwner = comment.authorId === currentUserId;
   const initials = comment.authorName.slice(0, 2).toUpperCase();
 
@@ -74,7 +74,8 @@ const CommentItem: React.FC<{
       )}
     </View>
   );
-};
+});
+CommentItem.displayName = 'CommentItem';
 
 const CommentsScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -143,6 +144,10 @@ const CommentsScreen: React.FC = () => {
         keyExtractor={item => item.id}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews
+        maxToRenderPerBatch={10}
+        initialNumToRender={8}
+        windowSize={10}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
           <>
@@ -295,9 +300,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
   },
-  actionBtn: {},
-  actionText: { fontSize: 14, color: '#6B7280', fontWeight: '500' },
-  likedText: { color: '#EF4444', fontWeight: '700' },
   commentCount: { fontSize: 14, color: '#6B7280', fontWeight: '500' },
   commentsLabel: {
     fontSize: 13,

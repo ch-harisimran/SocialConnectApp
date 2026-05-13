@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Text, StyleSheet, Pressable } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -50,4 +50,4 @@ const styles = StyleSheet.create({
   likedText: { color: '#EF4444', fontWeight: '700' },
 });
 
-export default AnimatedHeartButton;
+export default memo(AnimatedHeartButton);
