@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import { setNotificationsEnabled } from '../../store/slices/settingsSlice';
+import { notificationService } from '../../services/notificationService';
 
 interface SettingRowProps {
   label: string;
@@ -37,7 +40,8 @@ const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
 
 const SettingsScreen: React.FC = () => {
   const { user, logout } = useAuth();
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const dispatch = useAppDispatch();
+  const notificationsEnabled = useAppSelector(state => state.settings.notificationsEnabled);
   const [darkMode, setDarkMode] = useState(false);
   const [privateAccount, setPrivateAccount] = useState(false);
 
@@ -46,6 +50,21 @@ const SettingsScreen: React.FC = () => {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign Out', style: 'destructive', onPress: logout },
     ]);
+  };
+
+  const handleToggleNotifications = async (enabled: boolean) => {
+    if (enabled) {
+      const granted = await notificationService.requestPermissions();
+      if (!granted) {
+        Alert.alert(
+          'Permission Required',
+          'Please enable notifications in your device settings to receive alerts.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+    }
+    dispatch(setNotificationsEnabled(enabled));
   };
 
   return (
@@ -67,11 +86,11 @@ const SettingsScreen: React.FC = () => {
       <View style={styles.section}>
         <SettingRow
           label="Push Notifications"
-          description="Receive alerts for likes, comments, and follows"
+          description="Receive alerts for likes and comments on your posts"
           rightElement={
             <Switch
               value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
+              onValueChange={handleToggleNotifications}
               trackColor={{ false: '#D1D5DB', true: '#A5B4FC' }}
               thumbColor={notificationsEnabled ? '#6366F1' : '#9CA3AF'}
             />
