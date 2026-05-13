@@ -16,6 +16,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import FormInput from '../../components/auth/FormInput';
 import { useAuth } from '../../context/AuthContext';
 import { AuthStackParamList } from '../../navigation/AuthNavigator';
+import { rf, rw, rh } from '../../utils/responsive';
 
 type Nav = NativeStackNavigationProp<AuthStackParamList, 'Login'>;
 
@@ -121,33 +122,38 @@ const LoginScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   flex: { flex: 1, backgroundColor: '#fff' },
-  scroll: { flexGrow: 1, justifyContent: 'center', padding: 24 },
-  header: { marginBottom: 32, alignItems: 'center' },
-  title: { fontSize: 30, fontWeight: '700', color: '#111827', marginBottom: 6 },
-  subtitle: { fontSize: 15, color: '#6B7280' },
+  scroll: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    paddingHorizontal: rw(6.4),
+    paddingVertical: rh(4),
+  },
+  header: { marginBottom: rh(4), alignItems: 'center' },
+  title: { fontSize: rf(3.3), fontWeight: '700', color: '#111827', marginBottom: rh(0.7) },
+  subtitle: { fontSize: rf(1.7), color: '#6B7280' },
   form: { width: '100%' },
   serverErrorBox: {
     backgroundColor: '#FEE2E2',
     borderRadius: 8,
-    padding: 12,
-    marginBottom: 16,
+    padding: rw(3.2),
+    marginBottom: rh(2),
   },
-  serverErrorText: { color: '#B91C1C', fontSize: 13, textAlign: 'center' },
-  forgotLink: { alignSelf: 'flex-end', marginBottom: 20, marginTop: -8 },
-  forgotText: { fontSize: 13, color: '#6366F1', fontWeight: '600' },
+  serverErrorText: { color: '#B91C1C', fontSize: rf(1.5), textAlign: 'center' },
+  forgotLink: { alignSelf: 'flex-end', marginBottom: rh(2.5), marginTop: -rh(1) },
+  forgotText: { fontSize: rf(1.5), color: '#6366F1', fontWeight: '600' },
   button: {
     backgroundColor: '#6366F1',
     borderRadius: 10,
-    height: 52,
+    height: rh(6.4),
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
+    marginTop: rh(0.5),
   },
   buttonDisabled: { opacity: 0.6 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  footer: { flexDirection: 'row', justifyContent: 'center', marginTop: 24 },
-  footerText: { fontSize: 14, color: '#6B7280' },
-  footerLink: { fontSize: 14, color: '#6366F1', fontWeight: '700' },
+  buttonText: { color: '#fff', fontSize: rf(1.8), fontWeight: '700' },
+  footer: { flexDirection: 'row', justifyContent: 'center', marginTop: rh(3) },
+  footerText: { fontSize: rf(1.6), color: '#6B7280' },
+  footerLink: { fontSize: rf(1.6), color: '#6366F1', fontWeight: '700' },
 });
 
 export default LoginScreen;

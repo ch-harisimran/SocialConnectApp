@@ -19,6 +19,7 @@ import { useAuth } from '../../context/AuthContext';
 import { Comment } from '../../services/mockPosts';
 import { formatTimeAgo } from '../../utils/formatTime';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
+import AnimatedHeartButton from '../../components/AnimatedHeartButton';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'Comments'>;
 type Route = RouteProp<HomeStackParamList, 'Comments'>;
@@ -176,16 +177,12 @@ const CommentsScreen: React.FC = () => {
               ) : null}
 
               <View style={styles.postActions}>
-                <TouchableOpacity
-                  style={styles.actionBtn}
+                <AnimatedHeartButton
+                  liked={liked}
+                  count={post.likes.length}
+                  label={post.likes.length === 1 ? 'like' : 'likes'}
                   onPress={() => toggleLike(postId)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[styles.actionText, liked && styles.likedText]}>
-                    {liked ? '♥' : '♡'} {post.likes.length}{' '}
-                    {post.likes.length === 1 ? 'like' : 'likes'}
-                  </Text>
-                </TouchableOpacity>
+                />
                 <Text style={styles.commentCount}>
                   💬 {post.comments.length} {post.comments.length === 1 ? 'comment' : 'comments'}
                 </Text>

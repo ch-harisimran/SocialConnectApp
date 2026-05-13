@@ -9,46 +9,53 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
-  Animated,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withSequence,
+  withTiming,
+  withDelay,
+  withRepeat,
+} from 'react-native-reanimated';
+
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { usePosts } from '../../context/PostsContext';
 import { useAuth } from '../../context/AuthContext';
 import { formatTimeAgo } from '../../utils/formatTime';
+import { rf, rw, rh } from '../../utils/responsive';
 import { Post } from '../../services/mockPosts';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
+import AnimatedHeartButton from '../../components/AnimatedHeartButton';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'Home'>;
 
 // ─── LiveBadge ────────────────────────────────────────────────────────────────
 
 const LiveBadge: React.FC<{ lastSyncedAt: number | null }> = ({ lastSyncedAt }) => {
-  const [pulse] = useState(() => new Animated.Value(1));
+  const pulse = useSharedValue(1);
   const [, tick] = useState(0);
 
   useEffect(() => {
-    const animation = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 0.3, duration: 900, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
-      ])
+    pulse.value = withRepeat(
+      withSequence(withTiming(0.3, { duration: 900 }), withTiming(1, { duration: 900 })),
+      -1
     );
-    animation.start();
-    return () => animation.stop();
   }, [pulse]);
 
-  // Re-render every 30s so the "updated X ago" text stays fresh
   useEffect(() => {
     const interval = setInterval(() => tick(n => n + 1), 30_000);
     return () => clearInterval(interval);
   }, []);
 
+  const dotStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
   const timeLabel = lastSyncedAt ? formatTimeAgo(new Date(lastSyncedAt).toISOString()) : null;
 
   return (
     <View style={liveBadgeStyles.container}>
-      <Animated.View style={[liveBadgeStyles.dot, { opacity: pulse }]} />
+      <Animated.View style={[liveBadgeStyles.dot, dotStyle]} />
       <Text style={liveBadgeStyles.text}>LIVE{timeLabel ? ` · ${timeLabel}` : ''}</Text>
     </View>
   );
@@ -57,25 +64,24 @@ const LiveBadge: React.FC<{ lastSyncedAt: number | null }> = ({ lastSyncedAt }) 
 const liveBadgeStyles = StyleSheet.create({
   container: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   dot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#22C55E' },
-  text: { fontSize: 11, fontWeight: '700', color: '#22C55E', letterSpacing: 0.4 },
+  text: { fontSize: rf(1.2), fontWeight: '700', color: '#22C55E', letterSpacing: 0.4 },
 });
 
 // ─── NewActivityBanner ────────────────────────────────────────────────────────
 
 const NewActivityBanner: React.FC<{ onPress: () => void }> = ({ onPress }) => {
-  const [slideY] = useState(() => new Animated.Value(-40));
+  const slideY = useSharedValue(-40);
 
   useEffect(() => {
-    Animated.spring(slideY, {
-      toValue: 0,
-      useNativeDriver: true,
-      tension: 80,
-      friction: 10,
-    }).start();
+    slideY.value = withSpring(0, { damping: 10, stiffness: 80 });
   }, [slideY]);
 
+  const bannerAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: slideY.value }],
+  }));
+
   return (
-    <Animated.View style={[bannerStyles.wrapper, { transform: [{ translateY: slideY }] }]}>
+    <Animated.View style={[bannerStyles.wrapper, bannerAnimStyle]}>
       <TouchableOpacity style={bannerStyles.banner} onPress={onPress} activeOpacity={0.85}>
         <Text style={bannerStyles.text}>✦ New activity — tap to refresh</Text>
       </TouchableOpacity>
@@ -86,10 +92,10 @@ const NewActivityBanner: React.FC<{ onPress: () => void }> = ({ onPress }) => {
 const bannerStyles = StyleSheet.create({
   wrapper: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, alignItems: 'center' },
   banner: {
-    marginTop: 8,
+    marginTop: rh(1),
     backgroundColor: '#6366F1',
-    paddingVertical: 8,
-    paddingHorizontal: 20,
+    paddingVertical: rh(1),
+    paddingHorizontal: rw(5.3),
     borderRadius: 20,
     elevation: 4,
     shadowColor: '#6366F1',
@@ -97,22 +103,42 @@ const bannerStyles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 6,
   },
-  text: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  text: { color: '#fff', fontWeight: '700', fontSize: rf(1.5) },
 });
 
 // ─── PostCard ─────────────────────────────────────────────────────────────────
 
 const PostCard: React.FC<{
   post: Post;
+  index: number;
   currentUserId: string;
   onLike: (id: string) => void;
   onComment: (id: string) => void;
   onDelete: (id: string) => void;
   onViewProfile: (authorId: string, authorName: string) => void;
-}> = ({ post, currentUserId, onLike, onComment, onDelete, onViewProfile }) => {
+}> = ({ post, index, currentUserId, onLike, onComment, onDelete, onViewProfile }) => {
   const liked = post.likes.includes(currentUserId);
   const isOwner = post.authorId === currentUserId;
   const initials = post.authorName.slice(0, 2).toUpperCase();
+
+  // Staggered entrance animation (first 6 items only)
+  const opacity = useSharedValue(index < 6 ? 0 : 1);
+  const translateY = useSharedValue(index < 6 ? 24 : 0);
+
+  useEffect(() => {
+    if (index < 6) {
+      const delay = index * 70;
+      opacity.value = withDelay(delay, withTiming(1, { duration: 280 }));
+      translateY.value = withDelay(delay, withSpring(0, { damping: 16 }));
+    }
+    // Run once on mount only
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const cardAnimStyle = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ translateY: translateY.value }],
+  }));
 
   const confirmDelete = () => {
     Alert.alert('Delete post', 'Are you sure you want to delete this post?', [
@@ -122,7 +148,7 @@ const PostCard: React.FC<{
   };
 
   return (
-    <View style={styles.card}>
+    <Animated.View style={[styles.card, cardAnimStyle]}>
       <TouchableOpacity
         style={styles.cardHeader}
         onPress={() => onViewProfile(post.authorId, post.authorName)}
@@ -160,15 +186,11 @@ const PostCard: React.FC<{
       ) : null}
 
       <View style={styles.cardFooter}>
-        <TouchableOpacity
-          style={styles.actionBtn}
+        <AnimatedHeartButton
+          liked={liked}
+          count={post.likes.length}
           onPress={() => onLike(post.id)}
-          activeOpacity={0.7}
-        >
-          <Text style={[styles.actionText, liked && styles.likedText]}>
-            {liked ? '♥' : '♡'} {post.likes.length}
-          </Text>
-        </TouchableOpacity>
+        />
         <TouchableOpacity
           style={styles.actionBtn}
           onPress={() => onComment(post.id)}
@@ -180,7 +202,7 @@ const PostCard: React.FC<{
           <Text style={styles.actionText}>↗ Share</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </Animated.View>
   );
 };
 
@@ -214,6 +236,12 @@ const HomeScreen: React.FC = () => {
 
   const listRef = useRef<FlatList>(null);
 
+  // FAB scale animation
+  const fabScale = useSharedValue(1);
+  const fabAnimStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: fabScale.value }],
+  }));
+
   const handleLike = useCallback((id: string) => toggleLike(id), [toggleLike]);
   const handleDelete = useCallback((id: string) => deletePost(id), [deletePost]);
   const handleComment = useCallback(
@@ -225,7 +253,11 @@ const HomeScreen: React.FC = () => {
       navigation.navigate('UserProfile', { userId: authorId, userName: authorName }),
     [navigation]
   );
-  const handleCreatePost = useCallback(() => navigation.navigate('CreatePost'), [navigation]);
+  const handleCreatePost = useCallback(() => {
+    // eslint-disable-next-line react-hooks/immutability
+    fabScale.value = withSequence(withSpring(0.85, { damping: 5 }), withSpring(1, { damping: 8 }));
+    navigation.navigate('CreatePost');
+  }, [fabScale, navigation]);
 
   const handleNewActivityPress = useCallback(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
@@ -260,9 +292,10 @@ const HomeScreen: React.FC = () => {
         ref={listRef}
         data={posts}
         keyExtractor={item => item.id}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => (
           <PostCard
             post={item}
+            index={index}
             currentUserId={user?.id ?? ''}
             onLike={handleLike}
             onComment={handleComment}
@@ -304,9 +337,11 @@ const HomeScreen: React.FC = () => {
 
       {hasNewActivity && <NewActivityBanner onPress={handleNewActivityPress} />}
 
-      <TouchableOpacity style={styles.fab} onPress={handleCreatePost} activeOpacity={0.85}>
-        <Text style={styles.fabIcon}>+</Text>
-      </TouchableOpacity>
+      <Animated.View style={[styles.fabWrapper, fabAnimStyle]}>
+        <TouchableOpacity style={styles.fab} onPress={handleCreatePost} activeOpacity={0.85}>
+          <Text style={styles.fabIcon}>+</Text>
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 };
@@ -324,116 +359,117 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: rw(4.3),
+    paddingVertical: rh(1.7),
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
   },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: '#6366F1' },
-  headerAvatar: { width: 36, height: 36, borderRadius: 18 },
+  headerTitle: { fontSize: rf(2.2), fontWeight: '800', color: '#6366F1' },
+  headerAvatar: { width: rw(9.6), height: rw(9.6), borderRadius: rw(4.8) },
   headerAvatarCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: rw(9.6),
+    height: rw(9.6),
+    borderRadius: rw(4.8),
     backgroundColor: '#6366F1',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerAvatarText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  headerAvatarText: { color: '#fff', fontWeight: '700', fontSize: rf(1.5) },
   composerBar: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    marginHorizontal: 12,
-    marginTop: 12,
-    marginBottom: 4,
+    marginHorizontal: rw(3.2),
+    marginTop: rh(1.5),
+    marginBottom: rh(0.5),
     borderRadius: 12,
-    padding: 12,
+    padding: rw(3.2),
     borderWidth: 1,
     borderColor: '#E5E7EB',
-    gap: 10,
+    gap: rw(2.7),
   },
-  composerAvatar: { width: 38, height: 38, borderRadius: 19 },
+  composerAvatar: { width: rw(10.1), height: rw(10.1), borderRadius: rw(5.1) },
   composerAvatarCircle: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: rw(10.1),
+    height: rw(10.1),
+    borderRadius: rw(5.1),
     backgroundColor: '#6366F1',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  composerAvatarText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  composerPlaceholder: { fontSize: 14, color: '#9CA3AF', flex: 1 },
+  composerAvatarText: { color: '#fff', fontWeight: '700', fontSize: rf(1.5) },
+  composerPlaceholder: { fontSize: rf(1.6), color: '#9CA3AF', flex: 1 },
   composerPhotoBtn: { padding: 4 },
-  composerPhotoIcon: { fontSize: 18 },
-  feed: { paddingHorizontal: 12, paddingTop: 8, paddingBottom: 90 },
+  composerPhotoIcon: { fontSize: rf(2.0) },
+  feed: { paddingHorizontal: rw(3.2), paddingTop: rh(1), paddingBottom: rh(11) },
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 14,
-    marginBottom: 10,
+    padding: rw(3.7),
+    marginBottom: rh(1.2),
     borderWidth: 1,
     borderColor: '#E5E7EB',
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 10 },
-  avatarImage: { width: 42, height: 42, borderRadius: 21, marginRight: 10 },
+  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: rh(1.2) },
+  avatarImage: { width: rw(11.2), height: rw(11.2), borderRadius: rw(5.6), marginRight: rw(2.7) },
   avatarCircle: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: rw(11.2),
+    height: rw(11.2),
+    borderRadius: rw(5.6),
     backgroundColor: '#EEF2FF',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: rw(2.7),
   },
-  avatarText: { fontSize: 13, fontWeight: '700', color: '#6366F1' },
+  avatarText: { fontSize: rf(1.5), fontWeight: '700', color: '#6366F1' },
   authorInfo: { flex: 1 },
-  authorName: { fontSize: 14, fontWeight: '700', color: '#111827' },
-  postTime: { fontSize: 12, color: '#9CA3AF', marginTop: 1 },
+  authorName: { fontSize: rf(1.6), fontWeight: '700', color: '#111827' },
+  postTime: { fontSize: rf(1.4), color: '#9CA3AF', marginTop: 1 },
   deleteBtn: { padding: 4 },
-  deleteBtnText: { fontSize: 22, color: '#9CA3AF', lineHeight: 22 },
-  postContent: { fontSize: 14, color: '#374151', lineHeight: 22, marginBottom: 10 },
-  postImage: { width: '100%', height: 200, borderRadius: 10, marginBottom: 10 },
+  deleteBtnText: { fontSize: rf(2.4), color: '#9CA3AF', lineHeight: 22 },
+  postContent: { fontSize: rf(1.6), color: '#374151', lineHeight: 22, marginBottom: rh(1.2) },
+  postImage: { width: '100%', height: rh(24.6), borderRadius: 10, marginBottom: rh(1.2) },
   cardFooter: {
     flexDirection: 'row',
     borderTopWidth: 1,
     borderTopColor: '#F3F4F6',
-    paddingTop: 10,
-    gap: 16,
+    paddingTop: rh(1.2),
+    gap: rw(4.3),
   },
   actionBtn: { flexDirection: 'row', alignItems: 'center' },
-  actionText: { fontSize: 13, color: '#6B7280', fontWeight: '500' },
-  likedText: { color: '#EF4444', fontWeight: '700' },
+  actionText: { fontSize: rf(1.5), color: '#6B7280', fontWeight: '500' },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 80,
-    paddingHorizontal: 32,
+    paddingTop: rh(9.9),
+    paddingHorizontal: rw(8.5),
   },
-  emptyIcon: { fontSize: 48, marginBottom: 16 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 8 },
+  emptyIcon: { fontSize: rf(5.0), marginBottom: rh(2) },
+  emptyTitle: { fontSize: rf(2.0), fontWeight: '700', color: '#111827', marginBottom: rh(1) },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: rf(1.6),
     color: '#6B7280',
     textAlign: 'center',
     lineHeight: 22,
-    marginBottom: 24,
+    marginBottom: rh(3),
   },
   emptyButton: {
     backgroundColor: '#6366F1',
-    paddingVertical: 12,
-    paddingHorizontal: 28,
+    paddingVertical: rh(1.5),
+    paddingHorizontal: rw(7.5),
     borderRadius: 24,
   },
-  emptyButtonText: { color: '#fff', fontWeight: '700', fontSize: 15 },
-  fab: {
+  emptyButtonText: { color: '#fff', fontWeight: '700', fontSize: rf(1.7) },
+  fabWrapper: {
     position: 'absolute',
-    bottom: 24,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    bottom: rh(3),
+    right: rw(5.3),
+  },
+  fab: {
+    width: rw(14.9),
+    height: rw(14.9),
+    borderRadius: rw(7.5),
     backgroundColor: '#6366F1',
     alignItems: 'center',
     justifyContent: 'center',
@@ -443,7 +479,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 6,
   },
-  fabIcon: { color: '#fff', fontSize: 28, lineHeight: 32, fontWeight: '300' },
+  fabIcon: { color: '#fff', fontSize: rf(3.2), lineHeight: 32, fontWeight: '300' },
 });
 
 export default HomeScreen;
