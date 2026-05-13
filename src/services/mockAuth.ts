@@ -107,6 +107,15 @@ export const mockAuth = {
     return session;
   },
 
+  async getPublicProfile(
+    userId: string
+  ): Promise<{ id: string; name: string; bio: string; avatar: string | null } | null> {
+    const users = await getUsers();
+    const user = users.find(u => u.id === userId);
+    if (!user) return null;
+    return { id: user.id, name: user.name, bio: user.bio, avatar: user.avatar };
+  },
+
   async forgotPassword(email: string): Promise<void> {
     const users = await getUsers();
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());

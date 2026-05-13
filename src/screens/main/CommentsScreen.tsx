@@ -27,7 +27,8 @@ const CommentItem: React.FC<{
   comment: Comment;
   currentUserId: string;
   onDelete: (commentId: string) => void;
-}> = ({ comment, currentUserId, onDelete }) => {
+  onViewProfile: (authorId: string, authorName: string) => void;
+}> = ({ comment, currentUserId, onDelete, onViewProfile }) => {
   const isOwner = comment.authorId === currentUserId;
   const initials = comment.authorName.slice(0, 2).toUpperCase();
 
@@ -39,17 +40,27 @@ const CommentItem: React.FC<{
 
   return (
     <View style={styles.commentRow}>
-      {comment.authorAvatar ? (
-        <Image source={{ uri: comment.authorAvatar }} style={styles.commentAvatar} />
-      ) : (
-        <View style={styles.commentAvatarCircle}>
-          <Text style={styles.commentAvatarText}>{initials}</Text>
-        </View>
-      )}
+      <TouchableOpacity
+        onPress={() => onViewProfile(comment.authorId, comment.authorName)}
+        activeOpacity={0.7}
+      >
+        {comment.authorAvatar ? (
+          <Image source={{ uri: comment.authorAvatar }} style={styles.commentAvatar} />
+        ) : (
+          <View style={styles.commentAvatarCircle}>
+            <Text style={styles.commentAvatarText}>{initials}</Text>
+          </View>
+        )}
+      </TouchableOpacity>
 
       <View style={styles.commentBubble}>
         <View style={styles.commentHeader}>
-          <Text style={styles.commentAuthor}>{comment.authorName}</Text>
+          <TouchableOpacity
+            onPress={() => onViewProfile(comment.authorId, comment.authorName)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.commentAuthor}>{comment.authorName}</Text>
+          </TouchableOpacity>
           <Text style={styles.commentTime}>{formatTimeAgo(comment.createdAt)}</Text>
         </View>
         <Text style={styles.commentText}>{comment.text}</Text>
@@ -107,6 +118,10 @@ const CommentsScreen: React.FC = () => {
     await deleteComment(postId, commentId);
   };
 
+  const handleViewProfile = (authorId: string, authorName: string) => {
+    navigation.navigate('UserProfile', { userId: authorId, userName: authorName });
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.flex}
@@ -132,7 +147,11 @@ const CommentsScreen: React.FC = () => {
           <>
             {/* Post summary card */}
             <View style={styles.postCard}>
-              <View style={styles.postHeader}>
+              <TouchableOpacity
+                style={styles.postHeader}
+                onPress={() => handleViewProfile(post.authorId, post.authorName)}
+                activeOpacity={0.7}
+              >
                 {post.authorAvatar ? (
                   <Image source={{ uri: post.authorAvatar }} style={styles.postAvatar} />
                 ) : (
@@ -144,7 +163,7 @@ const CommentsScreen: React.FC = () => {
                   <Text style={styles.postAuthorName}>{post.authorName}</Text>
                   <Text style={styles.postTime}>{formatTimeAgo(post.createdAt)}</Text>
                 </View>
-              </View>
+              </TouchableOpacity>
 
               <Text style={styles.postContent}>{post.content}</Text>
 
@@ -183,6 +202,7 @@ const CommentsScreen: React.FC = () => {
             comment={item}
             currentUserId={user?.id ?? ''}
             onDelete={handleDeleteComment}
+            onViewProfile={handleViewProfile}
           />
         )}
       />
@@ -210,7 +230,7 @@ const CommentsScreen: React.FC = () => {
           maxLength={300}
           returnKeyType="send"
           onSubmitEditing={handleSend}
-          blurOnSubmit={false}
+          submitBehavior="blurAndSubmit"
         />
 
         <TouchableOpacity

@@ -26,7 +26,8 @@ const PostCard: React.FC<{
   onLike: (id: string) => void;
   onComment: (id: string) => void;
   onDelete: (id: string) => void;
-}> = ({ post, currentUserId, onLike, onComment, onDelete }) => {
+  onViewProfile: (authorId: string, authorName: string) => void;
+}> = ({ post, currentUserId, onLike, onComment, onDelete, onViewProfile }) => {
   const liked = post.likes.includes(currentUserId);
   const isOwner = post.authorId === currentUserId;
   const initials = post.authorName.slice(0, 2).toUpperCase();
@@ -40,7 +41,11 @@ const PostCard: React.FC<{
 
   return (
     <View style={styles.card}>
-      <View style={styles.cardHeader}>
+      <TouchableOpacity
+        style={styles.cardHeader}
+        onPress={() => onViewProfile(post.authorId, post.authorName)}
+        activeOpacity={0.7}
+      >
         {post.authorAvatar ? (
           <Image source={{ uri: post.authorAvatar }} style={styles.avatarImage} />
         ) : (
@@ -53,11 +58,18 @@ const PostCard: React.FC<{
           <Text style={styles.postTime}>{formatTimeAgo(post.createdAt)}</Text>
         </View>
         {isOwner && (
-          <TouchableOpacity onPress={confirmDelete} style={styles.deleteBtn} hitSlop={8}>
+          <TouchableOpacity
+            onPress={e => {
+              e.stopPropagation();
+              confirmDelete();
+            }}
+            style={styles.deleteBtn}
+            hitSlop={8}
+          >
             <Text style={styles.deleteBtnText}>⋯</Text>
           </TouchableOpacity>
         )}
-      </View>
+      </TouchableOpacity>
 
       <Text style={styles.postContent}>{post.content}</Text>
 
@@ -112,6 +124,11 @@ const HomeScreen: React.FC = () => {
     (id: string) => navigation.navigate('Comments', { postId: id }),
     [navigation]
   );
+  const handleViewProfile = useCallback(
+    (authorId: string, authorName: string) =>
+      navigation.navigate('UserProfile', { userId: authorId, userName: authorName }),
+    [navigation]
+  );
   const handleCreatePost = useCallback(() => navigation.navigate('CreatePost'), [navigation]);
 
   const initials = user?.name?.slice(0, 2).toUpperCase() ?? 'U';
@@ -147,6 +164,7 @@ const HomeScreen: React.FC = () => {
             onLike={handleLike}
             onComment={handleComment}
             onDelete={handleDelete}
+            onViewProfile={handleViewProfile}
           />
         )}
         ListHeaderComponent={
