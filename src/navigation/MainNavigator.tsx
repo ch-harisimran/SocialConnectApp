@@ -1,7 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View } from 'react-native';
-import HomeScreen from '../screens/main/HomeScreen';
+import HomeStackNavigator from './HomeStackNavigator';
 import ProfileStackNavigator from './ProfileStackNavigator';
 import SettingsScreen from '../screens/main/SettingsScreen';
 
@@ -46,7 +46,7 @@ const MainNavigator: React.FC = () => (
       },
     })}
   >
-    <Tab.Screen name="Home" component={HomeScreen} />
+    <Tab.Screen name="Home" component={HomeStackNavigator} />
     <Tab.Screen name="Profile" component={ProfileStackNavigator} />
     <Tab.Screen name="Settings" component={SettingsScreen} />
   </Tab.Navigator>
