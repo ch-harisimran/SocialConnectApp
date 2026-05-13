@@ -2,6 +2,15 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const POSTS_KEY = '@social_connect_posts';
 
+export interface Comment {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorAvatar: string | null;
+  text: string;
+  createdAt: string;
+}
+
 export interface Post {
   id: string;
   authorId: string;
@@ -11,11 +20,15 @@ export interface Post {
   imageUri: string | null;
   createdAt: string;
   likes: string[];
+  comments: Comment[];
 }
 
 const getPosts = async (): Promise<Post[]> => {
   const raw = await AsyncStorage.getItem(POSTS_KEY);
-  return raw ? JSON.parse(raw) : [];
+  if (!raw) return [];
+  const parsed: Post[] = JSON.parse(raw);
+  // Back-fill comments array for posts created before this field existed
+  return parsed.map(p => ({ ...p, comments: p.comments ?? [] }));
 };
 
 const savePosts = async (posts: Post[]): Promise<void> => {
@@ -41,6 +54,7 @@ export const mockPostsService = {
       ...data,
       createdAt: new Date().toISOString(),
       likes: [],
+      comments: [],
     };
     await savePosts([newPost, ...posts]);
     return newPost;
@@ -56,6 +70,45 @@ export const mockPostsService = {
     posts[index] = {
       ...post,
       likes: alreadyLiked ? post.likes.filter(id => id !== userId) : [...post.likes, userId],
+    };
+    await savePosts(posts);
+    return posts[index];
+  },
+
+  async addComment(
+    postId: string,
+    author: { id: string; name: string; avatar: string | null },
+    text: string
+  ): Promise<Post> {
+    const posts = await getPosts();
+    const index = posts.findIndex(p => p.id === postId);
+    if (index === -1) throw new Error('Post not found.');
+
+    const newComment: Comment = {
+      id: `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      authorId: author.id,
+      authorName: author.name,
+      authorAvatar: author.avatar,
+      text,
+      createdAt: new Date().toISOString(),
+    };
+    posts[index] = { ...posts[index], comments: [...posts[index].comments, newComment] };
+    await savePosts(posts);
+    return posts[index];
+  },
+
+  async deleteComment(postId: string, commentId: string, userId: string): Promise<Post> {
+    const posts = await getPosts();
+    const index = posts.findIndex(p => p.id === postId);
+    if (index === -1) throw new Error('Post not found.');
+
+    const comment = posts[index].comments.find(c => c.id === commentId);
+    if (!comment) throw new Error('Comment not found.');
+    if (comment.authorId !== userId) throw new Error('You can only delete your own comments.');
+
+    posts[index] = {
+      ...posts[index],
+      comments: posts[index].comments.filter(c => c.id !== commentId),
     };
     await savePosts(posts);
     return posts[index];

@@ -9,6 +9,8 @@ interface PostsContextType {
   refreshPosts: () => Promise<void>;
   createPost: (content: string, imageUri: string | null) => Promise<void>;
   toggleLike: (postId: string) => Promise<void>;
+  addComment: (postId: string, text: string) => Promise<void>;
+  deleteComment: (postId: string, commentId: string) => Promise<void>;
   deletePost: (postId: string) => Promise<void>;
 }
 
@@ -59,6 +61,22 @@ export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setPosts(prev => prev.map(p => (p.id === postId ? updated : p)));
   };
 
+  const addComment = async (postId: string, text: string) => {
+    if (!user) throw new Error('Not authenticated.');
+    const updated = await mockPostsService.addComment(
+      postId,
+      { id: user.id, name: user.name, avatar: user.avatar },
+      text
+    );
+    setPosts(prev => prev.map(p => (p.id === postId ? updated : p)));
+  };
+
+  const deleteComment = async (postId: string, commentId: string) => {
+    if (!user) return;
+    const updated = await mockPostsService.deleteComment(postId, commentId, user.id);
+    setPosts(prev => prev.map(p => (p.id === postId ? updated : p)));
+  };
+
   const deletePost = async (postId: string) => {
     if (!user) return;
     await mockPostsService.deletePost(postId, user.id);
@@ -67,7 +85,17 @@ export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   return (
     <PostsContext.Provider
-      value={{ posts, isLoading, isRefreshing, refreshPosts, createPost, toggleLike, deletePost }}
+      value={{
+        posts,
+        isLoading,
+        isRefreshing,
+        refreshPosts,
+        createPost,
+        toggleLike,
+        addComment,
+        deleteComment,
+        deletePost,
+      }}
     >
       {children}
     </PostsContext.Provider>

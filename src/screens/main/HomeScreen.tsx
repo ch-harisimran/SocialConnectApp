@@ -24,8 +24,9 @@ const PostCard: React.FC<{
   post: Post;
   currentUserId: string;
   onLike: (id: string) => void;
+  onComment: (id: string) => void;
   onDelete: (id: string) => void;
-}> = ({ post, currentUserId, onLike, onDelete }) => {
+}> = ({ post, currentUserId, onLike, onComment, onDelete }) => {
   const liked = post.likes.includes(currentUserId);
   const isOwner = post.authorId === currentUserId;
   const initials = post.authorName.slice(0, 2).toUpperCase();
@@ -74,8 +75,12 @@ const PostCard: React.FC<{
             {liked ? '♥' : '♡'} {post.likes.length}
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn}>
-          <Text style={styles.actionText}>💬 Comment</Text>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => onComment(post.id)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.actionText}>💬 {post.comments.length}</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionBtn}>
           <Text style={styles.actionText}>↗ Share</Text>
@@ -103,6 +108,10 @@ const HomeScreen: React.FC = () => {
 
   const handleLike = useCallback((id: string) => toggleLike(id), [toggleLike]);
   const handleDelete = useCallback((id: string) => deletePost(id), [deletePost]);
+  const handleComment = useCallback(
+    (id: string) => navigation.navigate('Comments', { postId: id }),
+    [navigation]
+  );
   const handleCreatePost = useCallback(() => navigation.navigate('CreatePost'), [navigation]);
 
   const initials = user?.name?.slice(0, 2).toUpperCase() ?? 'U';
@@ -136,6 +145,7 @@ const HomeScreen: React.FC = () => {
             post={item}
             currentUserId={user?.id ?? ''}
             onLike={handleLike}
+            onComment={handleComment}
             onDelete={handleDelete}
           />
         )}
