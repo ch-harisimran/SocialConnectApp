@@ -5,10 +5,12 @@ const SETTINGS_KEY = '@social_connect_settings';
 
 interface SettingsState {
   notificationsEnabled: boolean;
+  isDarkMode: boolean;
 }
 
 const initialState: SettingsState = {
   notificationsEnabled: true,
+  isDarkMode: false,
 };
 
 export const loadSettings = createAsyncThunk('settings/load', async () => {
@@ -18,12 +20,23 @@ export const loadSettings = createAsyncThunk('settings/load', async () => {
 
 export const setNotificationsEnabled = createAsyncThunk(
   'settings/setNotificationsEnabled',
-  async (enabled: boolean) => {
-    const raw = await AsyncStorage.getItem(SETTINGS_KEY);
-    const current: SettingsState = raw ? JSON.parse(raw) : initialState;
+  async (enabled: boolean, { getState }) => {
+    const state = (getState() as { settings: SettingsState }).settings;
     await AsyncStorage.setItem(
       SETTINGS_KEY,
-      JSON.stringify({ ...current, notificationsEnabled: enabled })
+      JSON.stringify({ ...state, notificationsEnabled: enabled })
+    );
+    return enabled;
+  }
+);
+
+export const setDarkMode = createAsyncThunk(
+  'settings/setDarkMode',
+  async (enabled: boolean, { getState }) => {
+    const state = (getState() as { settings: SettingsState }).settings;
+    await AsyncStorage.setItem(
+      SETTINGS_KEY,
+      JSON.stringify({ ...state, isDarkMode: enabled })
     );
     return enabled;
   }
@@ -37,9 +50,13 @@ const settingsSlice = createSlice({
     builder
       .addCase(loadSettings.fulfilled, (state, action) => {
         state.notificationsEnabled = action.payload.notificationsEnabled ?? true;
+        state.isDarkMode = action.payload.isDarkMode ?? false;
       })
       .addCase(setNotificationsEnabled.fulfilled, (state, action) => {
         state.notificationsEnabled = action.payload;
+      })
+      .addCase(setDarkMode.fulfilled, (state, action) => {
+        state.isDarkMode = action.payload;
       });
   },
 });

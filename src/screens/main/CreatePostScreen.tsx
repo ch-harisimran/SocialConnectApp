@@ -12,12 +12,14 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { usePosts } from '../../context/PostsContext';
 import { useAuth } from '../../context/AuthContext';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
+import { useTheme } from '../../utils/theme';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'CreatePost'>;
 
@@ -27,6 +29,8 @@ const CreatePostScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { createPost } = usePosts();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
+  const t = useTheme();
   const [content, setContent] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -42,7 +46,7 @@ const CreatePostScreen: React.FC = () => {
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'] as ImagePicker.MediaType[],
       allowsEditing: true,
       quality: 0.8,
     });
@@ -98,21 +102,37 @@ const CreatePostScreen: React.FC = () => {
   };
 
   const initials = user?.name?.slice(0, 2).toUpperCase() ?? 'U';
+  const progressPct = Math.min(content.length / MAX_CHARS, 1);
+  const progressColor =
+    charsLeft < 20 ? t.danger : charsLeft < 80 ? '#F59E0B' : t.accent;
 
   return (
     <KeyboardAvoidingView
-      style={styles.flex}
+      style={[styles.flex, { backgroundColor: t.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.navbar}>
+      {/* Navbar with safe area */}
+      <View
+        style={[
+          styles.navbar,
+          {
+            backgroundColor: t.header,
+            borderBottomColor: t.border,
+            paddingTop: insets.top + 10,
+          },
+        ]}
+      >
         <TouchableOpacity onPress={handleDiscard} style={styles.navBtn}>
-          <Text style={styles.navCancel}>Cancel</Text>
+          <Text style={[styles.navCancel, { color: t.subtext }]}>Cancel</Text>
         </TouchableOpacity>
-        <Text style={styles.navTitle}>New Post</Text>
+        <Text style={[styles.navTitle, { color: t.text }]}>New Post</Text>
         <TouchableOpacity
           onPress={handlePost}
           disabled={!canPost}
-          style={[styles.postBtn, !canPost && styles.postBtnDisabled]}
+          style={[
+            styles.postBtn,
+            { backgroundColor: canPost ? t.accent : t.accentLight },
+          ]}
         >
           {isSubmitting ? (
             <ActivityIndicator size="small" color="#fff" />
@@ -122,22 +142,25 @@ const CreatePostScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.body} keyboardShouldPersistTaps="handled">
+      <ScrollView
+        style={[styles.body, { backgroundColor: t.card }]}
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.composer}>
           {user?.avatar ? (
             <Image source={{ uri: user.avatar }} style={styles.avatar} />
           ) : (
-            <View style={styles.avatarPlaceholder}>
+            <View style={[styles.avatarPlaceholder, { backgroundColor: t.accent }]}>
               <Text style={styles.avatarInitials}>{initials}</Text>
             </View>
           )}
           <View style={styles.inputArea}>
-            <Text style={styles.authorName}>{user?.name ?? 'You'}</Text>
+            <Text style={[styles.authorName, { color: t.text }]}>{user?.name ?? 'You'}</Text>
             <TextInput
               ref={inputRef}
-              style={styles.textInput}
+              style={[styles.textInput, { color: t.text }]}
               placeholder="What's on your mind?"
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={t.placeholder}
               multiline
               autoFocus
               value={content}
@@ -155,18 +178,46 @@ const CreatePostScreen: React.FC = () => {
             </TouchableOpacity>
           </View>
         ) : null}
+
+        {/* Subtle separator before toolbar area */}
+        <View style={{ height: 60 }} />
       </ScrollView>
 
-      <View style={styles.toolbar}>
+      {/* Toolbar */}
+      <View
+        style={[
+          styles.toolbar,
+          {
+            backgroundColor: t.card,
+            borderTopColor: t.border,
+            paddingBottom: insets.bottom + 4,
+          },
+        ]}
+      >
         <TouchableOpacity style={styles.toolbarBtn} onPress={showImageOptions}>
           <Text style={styles.toolbarIcon}>🖼</Text>
-          <Text style={styles.toolbarLabel}>Photo</Text>
+          <Text style={[styles.toolbarLabel, { color: t.accent }]}>Photo</Text>
         </TouchableOpacity>
 
-        <View style={styles.charCounter}>
-          <Text style={[styles.charCountText, charsLeft < 50 && styles.charCountWarn]}>
-            {charsLeft}
-          </Text>
+        {/* Circular progress ring + count */}
+        <View style={styles.charGroup}>
+          <Text style={[styles.charCountText, { color: progressColor }]}>{charsLeft}</Text>
+          <View
+            style={[
+              styles.progressBar,
+              { backgroundColor: t.border },
+            ]}
+          >
+            <View
+              style={[
+                styles.progressFill,
+                {
+                  width: `${progressPct * 100}%` as unknown as number,
+                  backgroundColor: progressColor,
+                },
+              ]}
+            />
+          </View>
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -174,28 +225,25 @@ const CreatePostScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  flex: { flex: 1, backgroundColor: '#fff' },
+  flex: { flex: 1 },
   navbar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  navBtn: { minWidth: 60 },
-  navTitle: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  navCancel: { fontSize: 15, color: '#6B7280' },
+  navBtn: { minWidth: 64 },
+  navTitle: { fontSize: 17, fontWeight: '700' },
+  navCancel: { fontSize: 15, fontWeight: '500' },
   postBtn: {
-    backgroundColor: '#6366F1',
-    paddingVertical: 7,
-    paddingHorizontal: 18,
-    borderRadius: 20,
-    minWidth: 60,
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 22,
+    minWidth: 64,
     alignItems: 'center',
   },
-  postBtnDisabled: { backgroundColor: '#C7D2FE' },
   postBtnText: { color: '#fff', fontWeight: '700', fontSize: 14 },
   body: { flex: 1 },
   composer: {
@@ -203,21 +251,19 @@ const styles = StyleSheet.create({
     padding: 16,
     gap: 12,
   },
-  avatar: { width: 44, height: 44, borderRadius: 22 },
+  avatar: { width: 46, height: 46, borderRadius: 23 },
   avatarPlaceholder: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#6366F1',
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarInitials: { fontSize: 16, fontWeight: '800', color: '#fff' },
+  avatarInitials: { fontSize: 17, fontWeight: '800', color: '#fff' },
   inputArea: { flex: 1 },
-  authorName: { fontSize: 14, fontWeight: '700', color: '#111827', marginBottom: 6 },
+  authorName: { fontSize: 15, fontWeight: '700', marginBottom: 6 },
   textInput: {
     fontSize: 16,
-    color: '#111827',
     lineHeight: 24,
     minHeight: 120,
     textAlignVertical: 'top',
@@ -225,19 +271,19 @@ const styles = StyleSheet.create({
   imagePreviewWrapper: {
     marginHorizontal: 16,
     marginBottom: 16,
-    borderRadius: 12,
+    borderRadius: 14,
     overflow: 'hidden',
     position: 'relative',
   },
-  imagePreview: { width: '100%', height: 220, borderRadius: 12 },
+  imagePreview: { width: '100%', height: 220, borderRadius: 14 },
   removeImageBtn: {
     position: 'absolute',
-    top: 8,
-    right: 8,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    top: 10,
+    right: 10,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -246,17 +292,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
-    backgroundColor: '#fff',
+    paddingTop: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
   toolbarBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: 16 },
   toolbarIcon: { fontSize: 20 },
-  toolbarLabel: { fontSize: 13, color: '#6B7280', fontWeight: '600' },
-  charCounter: { marginLeft: 'auto' },
-  charCountText: { fontSize: 13, color: '#9CA3AF', fontWeight: '600' },
-  charCountWarn: { color: '#EF4444' },
+  toolbarLabel: { fontSize: 13, fontWeight: '600' },
+  charGroup: { marginLeft: 'auto', alignItems: 'flex-end', gap: 4 },
+  charCountText: { fontSize: 13, fontWeight: '700' },
+  progressBar: {
+    width: 80,
+    height: 4,
+    borderRadius: 2,
+    overflow: 'hidden',
+  },
+  progressFill: { height: 4, borderRadius: 2 },
 });
 
 export default CreatePostScreen;

@@ -1,11 +1,5 @@
-import React, { memo } from 'react';
-import { Text, StyleSheet, Pressable } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withSequence,
-} from 'react-native-reanimated';
+import React, { memo, useRef } from 'react';
+import { Text, StyleSheet, Pressable, Animated } from 'react-native';
 import { rf } from '../utils/responsive';
 
 interface Props {
@@ -16,25 +10,30 @@ interface Props {
 }
 
 const AnimatedHeartButton: React.FC<Props> = ({ liked, count, onPress, label }) => {
-  const scale = useSharedValue(1);
+  const scale = useRef(new Animated.Value(1)).current;
 
   const handlePress = () => {
     if (!liked) {
-      scale.value = withSequence(
-        withSpring(1.5, { damping: 4, stiffness: 300 }),
-        withSpring(1, { damping: 10 })
-      );
+      Animated.sequence([
+        Animated.spring(scale, {
+          toValue: 1.5,
+          damping: 4,
+          stiffness: 300,
+          useNativeDriver: true,
+        }),
+        Animated.spring(scale, {
+          toValue: 1,
+          damping: 10,
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
     onPress();
   };
 
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
   return (
     <Pressable onPress={handlePress} style={styles.btn} hitSlop={6}>
-      <Animated.View style={animStyle}>
+      <Animated.View style={{ transform: [{ scale }] }}>
         <Text style={[styles.text, liked && styles.likedText]}>
           {liked ? '♥' : '♡'} {count}
           {label ? ` ${label}` : ''}

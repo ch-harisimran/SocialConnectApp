@@ -1,228 +1,279 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Alert } from 'react-native';
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Switch,
+  Alert,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../../context/AuthContext';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { setNotificationsEnabled } from '../../store/slices/settingsSlice';
+import { setNotificationsEnabled, setDarkMode } from '../../store/slices/settingsSlice';
 import { notificationService } from '../../services/notificationService';
+import { useTheme } from '../../utils/theme';
+import { rf } from '../../utils/responsive';
 
-interface SettingRowProps {
+// ─── Types ───────────────────────────────────────────────────────────────────
+interface RowProps {
+  icon: string;
+  iconBg: string;
   label: string;
-  description?: string;
+  sublabel?: string;
+  right?: React.ReactNode;
   onPress?: () => void;
-  rightElement?: React.ReactNode;
   danger?: boolean;
+  isLast?: boolean;
 }
 
-const SettingRow: React.FC<SettingRowProps> = ({
-  label,
-  description,
-  onPress,
-  rightElement,
-  danger = false,
+// ─── SettingRow ───────────────────────────────────────────────────────────────
+const SettingRow: React.FC<RowProps & { borderColor: string; textColor: string; subtextColor: string }> = ({
+  icon, iconBg, label, sublabel, right, onPress, danger, isLast, borderColor, textColor, subtextColor,
 }) => (
   <TouchableOpacity
-    style={styles.row}
+    style={[rowStyles.row, !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: borderColor }]}
     onPress={onPress}
     disabled={!onPress}
-    activeOpacity={onPress ? 0.6 : 1}
+    activeOpacity={onPress ? 0.55 : 1}
   >
-    <View style={styles.rowLeft}>
-      <Text style={[styles.rowLabel, danger && styles.dangerText]}>{label}</Text>
-      {description ? <Text style={styles.rowDescription}>{description}</Text> : null}
+    <View style={[rowStyles.iconBox, { backgroundColor: iconBg }]}>
+      <Text style={rowStyles.iconEmoji}>{icon}</Text>
     </View>
-    {rightElement ?? (onPress ? <Text style={styles.chevron}>›</Text> : null)}
+    <View style={rowStyles.labelWrap}>
+      <Text style={[rowStyles.label, { color: danger ? '#EF4444' : textColor }]}>{label}</Text>
+      {sublabel ? <Text style={[rowStyles.sublabel, { color: subtextColor }]}>{sublabel}</Text> : null}
+    </View>
+    {right ?? (onPress ? <Text style={[rowStyles.chevron, { color: borderColor }]}>›</Text> : null)}
   </TouchableOpacity>
 );
+const rowStyles = StyleSheet.create({
+  row: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, gap: 14 },
+  iconBox: { width: 36, height: 36, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  iconEmoji: { fontSize: 18 },
+  labelWrap: { flex: 1 },
+  label: { fontSize: rf(1.65), fontWeight: '500' },
+  sublabel: { fontSize: rf(1.3), marginTop: 1 },
+  chevron: { fontSize: 22 },
+});
 
-const SectionHeader: React.FC<{ title: string }> = ({ title }) => (
-  <Text style={styles.sectionHeader}>{title}</Text>
+// ─── SectionCard ─────────────────────────────────────────────────────────────
+const SectionCard: React.FC<{ title: string; children: React.ReactNode; bgColor: string; borderColor: string; titleColor: string }> = ({
+  title, children, bgColor, borderColor, titleColor,
+}) => (
+  <View style={sectionStyles.wrap}>
+    <Text style={[sectionStyles.title, { color: titleColor }]}>{title}</Text>
+    <View style={[sectionStyles.card, { backgroundColor: bgColor, borderColor }]}>
+      {children}
+    </View>
+  </View>
 );
+const sectionStyles = StyleSheet.create({
+  wrap: { marginBottom: 8 },
+  title: { fontSize: rf(1.2), fontWeight: '800', textTransform: 'uppercase', letterSpacing: 1.1, paddingHorizontal: 20, paddingBottom: 8 },
+  card: { marginHorizontal: 16, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+});
 
+// ─── SettingsScreen ───────────────────────────────────────────────────────────
 const SettingsScreen: React.FC = () => {
   const { user, logout } = useAuth();
   const dispatch = useAppDispatch();
-  const notificationsEnabled = useAppSelector(state => state.settings.notificationsEnabled);
-  const [darkMode, setDarkMode] = useState(false);
-  const [privateAccount, setPrivateAccount] = useState(false);
+  const insets = useSafeAreaInsets();
+  const t = useTheme();
+  const notificationsEnabled = useAppSelector(s => s.settings.notificationsEnabled);
+  const isDarkMode = useAppSelector(s => s.settings.isDarkMode);
 
-  const handleLogout = () => {
+  const handleLogout = () =>
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign Out', style: 'destructive', onPress: logout },
     ]);
-  };
 
   const handleToggleNotifications = async (enabled: boolean) => {
     if (enabled) {
       const granted = await notificationService.requestPermissions();
       if (!granted) {
-        Alert.alert(
-          'Permission Required',
-          'Please enable notifications in your device settings to receive alerts.',
-          [{ text: 'OK' }]
-        );
+        Alert.alert('Permission Required', 'Enable notifications in your device settings.', [{ text: 'OK' }]);
         return;
       }
     }
     dispatch(setNotificationsEnabled(enabled));
   };
 
+  const rowProps = { borderColor: t.border, textColor: t.text, subtextColor: t.subtext };
+
+  const switchFor = (value: boolean, onChange: (v: boolean) => void) => (
+    <Switch
+      value={value}
+      onValueChange={onChange}
+      trackColor={{ false: t.border, true: '#A5B4FC' }}
+      thumbColor={value ? t.accent : t.placeholder}
+    />
+  );
+
+  const initials = user?.name?.slice(0, 2).toUpperCase() ?? 'U';
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <View style={styles.profileCard}>
-        <View style={styles.avatarCircle}>
-          <Text style={styles.avatarText}>{user?.name?.slice(0, 2).toUpperCase() ?? 'U'}</Text>
+    <ScrollView
+      style={[styles.root, { backgroundColor: t.bg }]}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={{ height: insets.top }} />
+
+      {/* ── Page title ── */}
+      <View style={[styles.pageHeader, { borderBottomColor: t.border }]}>
+        <Text style={[styles.pageTitle, { color: t.text }]}>Settings</Text>
+      </View>
+
+      {/* ── Profile hero card ── */}
+      <View style={[styles.profileHero, { backgroundColor: t.accent }]}>
+        <View style={styles.profileHeroBlob1} />
+        <View style={styles.profileHeroBlob2} />
+
+        <View style={styles.profileHeroContent}>
+          <View style={[styles.profileAvatar, { borderColor: 'rgba(255,255,255,0.6)' }]}>
+            <Text style={styles.profileAvatarText}>{initials}</Text>
+          </View>
+          <View style={styles.profileHeroMeta}>
+            <Text style={styles.profileHeroName}>{user?.name ?? 'User'}</Text>
+            <Text style={styles.profileHeroEmail}>{user?.email ?? ''}</Text>
+            <View style={styles.profileHeroBadge}>
+              <View style={styles.heroDot} />
+              <Text style={styles.profileHeroBadgeText}>Active now</Text>
+            </View>
+          </View>
         </View>
-        <View style={styles.profileInfo}>
-          <Text style={styles.profileName}>{user?.name ?? 'User'}</Text>
-          <Text style={styles.profileEmail}>{user?.email ?? ''}</Text>
+
+        {/* Mini stats */}
+        <View style={styles.heroStats}>
+          {[
+            { label: 'Posts', value: '12' },
+            { label: 'Followers', value: '248' },
+            { label: 'Following', value: '91' },
+          ].map((s, i, arr) => (
+            <React.Fragment key={s.label}>
+              <View style={styles.heroStatItem}>
+                <Text style={styles.heroStatValue}>{s.value}</Text>
+                <Text style={styles.heroStatLabel}>{s.label}</Text>
+              </View>
+              {i < arr.length - 1 && <View style={styles.heroStatDivider} />}
+            </React.Fragment>
+          ))}
         </View>
-        <TouchableOpacity style={styles.editBtn}>
-          <Text style={styles.editBtnText}>Edit</Text>
-        </TouchableOpacity>
       </View>
 
-      <SectionHeader title="Notifications" />
-      <View style={styles.section}>
-        <SettingRow
-          label="Push Notifications"
-          description="Receive alerts for likes and comments on your posts"
-          rightElement={
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={handleToggleNotifications}
-              trackColor={{ false: '#D1D5DB', true: '#A5B4FC' }}
-              thumbColor={notificationsEnabled ? '#6366F1' : '#9CA3AF'}
-            />
-          }
-        />
-      </View>
+      <View style={styles.body}>
 
-      <SectionHeader title="Appearance" />
-      <View style={styles.section}>
-        <SettingRow
-          label="Dark Mode"
-          description="Switch to a darker color scheme"
-          rightElement={
-            <Switch
-              value={darkMode}
-              onValueChange={setDarkMode}
-              trackColor={{ false: '#D1D5DB', true: '#A5B4FC' }}
-              thumbColor={darkMode ? '#6366F1' : '#9CA3AF'}
-            />
-          }
-        />
-      </View>
+        {/* ── Account ── */}
+        <SectionCard title="Account" bgColor={t.card} borderColor={t.border} titleColor={t.subtext}>
+          <SettingRow {...rowProps} icon="✏️" iconBg="#EEF2FF" label="Edit Profile"
+            sublabel="Name, bio and photo"
+            onPress={() => Alert.alert('Coming soon', 'Edit profile is not yet available.')} />
+          <SettingRow {...rowProps} icon="🔒" iconBg="#F0FDF4" label="Change Password"
+            onPress={() => Alert.alert('Coming soon', 'Change password is not yet available.')} />
+          <SettingRow {...rowProps} icon="📧" iconBg="#FFF7ED" label="Email Address"
+            sublabel={user?.email ?? ''} isLast />
+        </SectionCard>
 
-      <SectionHeader title="Privacy & Security" />
-      <View style={styles.section}>
-        <SettingRow
-          label="Private Account"
-          description="Only approved followers can see your posts"
-          rightElement={
-            <Switch
-              value={privateAccount}
-              onValueChange={setPrivateAccount}
-              trackColor={{ false: '#D1D5DB', true: '#A5B4FC' }}
-              thumbColor={privateAccount ? '#6366F1' : '#9CA3AF'}
-            />
-          }
-        />
-        <SettingRow
-          label="Change Password"
-          onPress={() => Alert.alert('Coming soon', 'This feature is not yet available.')}
-        />
-        <SettingRow
-          label="Blocked Users"
-          onPress={() => Alert.alert('Coming soon', 'This feature is not yet available.')}
-        />
-      </View>
+        {/* ── Notifications ── */}
+        <SectionCard title="Notifications" bgColor={t.card} borderColor={t.border} titleColor={t.subtext}>
+          <SettingRow {...rowProps} icon="🔔" iconBg="#FEF3C7" label="Push Notifications"
+            sublabel="Likes, comments and activity"
+            right={switchFor(notificationsEnabled, handleToggleNotifications)} />
+          <SettingRow {...rowProps} icon="💬" iconBg="#EDE9FE" label="Comment Alerts"
+            sublabel="When someone replies to you"
+            right={switchFor(notificationsEnabled, handleToggleNotifications)} isLast />
+        </SectionCard>
 
-      <SectionHeader title="About" />
-      <View style={styles.section}>
-        <SettingRow label="Version" rightElement={<Text style={styles.versionText}>1.0.0</Text>} />
-        <SettingRow
-          label="Terms of Service"
-          onPress={() => Alert.alert('Coming soon', 'This feature is not yet available.')}
-        />
-        <SettingRow
-          label="Privacy Policy"
-          onPress={() => Alert.alert('Coming soon', 'This feature is not yet available.')}
-        />
-      </View>
+        {/* ── Appearance ── */}
+        <SectionCard title="Appearance" bgColor={t.card} borderColor={t.border} titleColor={t.subtext}>
+          <SettingRow {...rowProps} icon="🌙" iconBg={isDarkMode ? '#1E1B4B' : '#EEF2FF'} label="Dark Mode"
+            sublabel={isDarkMode ? 'On — dark theme active' : 'Off — using light theme'}
+            right={switchFor(isDarkMode, v => { dispatch(setDarkMode(v)); })} isLast />
+        </SectionCard>
 
-      <View style={styles.section}>
-        <SettingRow label="Sign Out" onPress={handleLogout} danger />
-      </View>
+        {/* ── Privacy ── */}
+        <SectionCard title="Privacy & Security" bgColor={t.card} borderColor={t.border} titleColor={t.subtext}>
+          <SettingRow {...rowProps} icon="🛡️" iconBg="#F0FDF4" label="Privacy Policy"
+            onPress={() => Alert.alert('Coming soon', 'This feature is not yet available.')} />
+          <SettingRow {...rowProps} icon="🚫" iconBg="#FFF1F2" label="Blocked Users"
+            onPress={() => Alert.alert('Coming soon', 'This feature is not yet available.')} isLast />
+        </SectionCard>
 
-      <View style={{ height: 32 }} />
+        {/* ── About ── */}
+        <SectionCard title="About" bgColor={t.card} borderColor={t.border} titleColor={t.subtext}>
+          <SettingRow {...rowProps} icon="ℹ️" iconBg="#EFF6FF" label="App Version"
+            right={<Text style={[styles.versionChip, { color: t.subtext, backgroundColor: t.inputBg }]}>1.0.0</Text>} />
+          <SettingRow {...rowProps} icon="📄" iconBg="#F0FDF4" label="Terms of Service"
+            onPress={() => Alert.alert('Coming soon', 'This feature is not yet available.')} isLast />
+        </SectionCard>
+
+        {/* ── Sign out ── */}
+        <View style={[styles.signOutCard, { backgroundColor: '#FFF1F2', borderColor: '#FECDD3' }]}>
+          <SettingRow
+            borderColor="#FECDD3" textColor={t.text} subtextColor={t.subtext}
+            icon="🚪" iconBg="#FFE4E6" label="Sign Out"
+            sublabel="You'll need to sign in again"
+            onPress={handleLogout} danger isLast
+          />
+        </View>
+
+        <View style={{ height: insets.bottom + 24 }} />
+      </View>
     </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3F4F6' },
-  profileCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    padding: 16,
-    marginBottom: 16,
-    borderBottomWidth: 1,
-    borderColor: '#E5E7EB',
+  root: { flex: 1 },
+  pageHeader: {
+    paddingHorizontal: 20, paddingVertical: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  avatarCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor: '#6366F1',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
+  pageTitle: { fontSize: rf(3), fontWeight: '900', letterSpacing: -0.7 },
+
+  // Profile hero
+  profileHero: {
+    marginHorizontal: 16, marginTop: 16, marginBottom: 24,
+    borderRadius: 24, padding: 20, overflow: 'hidden',
   },
-  avatarText: { fontSize: 18, fontWeight: '800', color: '#fff' },
-  profileInfo: { flex: 1 },
-  profileName: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  profileEmail: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  editBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: '#6366F1',
+  profileHeroBlob1: {
+    position: 'absolute', width: 160, height: 160, borderRadius: 80,
+    backgroundColor: 'rgba(255,255,255,0.09)', top: -50, right: -30,
   },
-  editBtnText: { fontSize: 13, fontWeight: '700', color: '#6366F1' },
-  sectionHeader: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#6B7280',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    paddingHorizontal: 16,
-    paddingBottom: 6,
-    paddingTop: 4,
+  profileHeroBlob2: {
+    position: 'absolute', width: 100, height: 100, borderRadius: 50,
+    backgroundColor: 'rgba(255,255,255,0.06)', bottom: -20, left: 20,
   },
-  section: {
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: '#E5E7EB',
-    marginBottom: 16,
+  profileHeroContent: { flexDirection: 'row', alignItems: 'center', gap: 16, marginBottom: 20 },
+  profileAvatar: {
+    width: 68, height: 68, borderRadius: 34, borderWidth: 3,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    alignItems: 'center', justifyContent: 'center',
   },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+  profileAvatarText: { fontSize: 22, fontWeight: '900', color: '#fff' },
+  profileHeroMeta: { flex: 1 },
+  profileHeroName: { fontSize: rf(2.1), fontWeight: '900', color: '#fff', letterSpacing: -0.4 },
+  profileHeroEmail: { fontSize: rf(1.35), color: 'rgba(255,255,255,0.7)', marginTop: 2 },
+  profileHeroBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 6 },
+  heroDot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#4ADE80' },
+  profileHeroBadgeText: { fontSize: rf(1.3), color: 'rgba(255,255,255,0.85)', fontWeight: '600' },
+  heroStats: {
+    flexDirection: 'row', alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 14, padding: 12,
   },
-  rowLeft: { flex: 1 },
-  rowLabel: { fontSize: 15, color: '#111827' },
-  rowDescription: { fontSize: 12, color: '#9CA3AF', marginTop: 2 },
-  chevron: { fontSize: 20, color: '#D1D5DB', marginLeft: 8 },
-  dangerText: { color: '#EF4444', fontWeight: '600' },
-  versionText: { fontSize: 14, color: '#9CA3AF' },
+  heroStatItem: { flex: 1, alignItems: 'center' },
+  heroStatValue: { fontSize: rf(2.0), fontWeight: '900', color: '#fff' },
+  heroStatLabel: { fontSize: rf(1.25), color: 'rgba(255,255,255,0.7)', marginTop: 2 },
+  heroStatDivider: { width: 1, height: 28, backgroundColor: 'rgba(255,255,255,0.25)' },
+
+  body: { gap: 20 },
+  signOutCard: { marginHorizontal: 16, borderRadius: 18, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
+  versionChip: {
+    fontSize: rf(1.35), fontWeight: '600', paddingHorizontal: 10,
+    paddingVertical: 3, borderRadius: 8,
+  },
 });
 
 export default SettingsScreen;

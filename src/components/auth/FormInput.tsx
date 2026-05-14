@@ -6,6 +6,7 @@ interface FormInputProps extends TextInputProps {
   error?: string;
   touched?: boolean;
   isPassword?: boolean;
+  icon?: string;
 }
 
 const FormInput: React.FC<FormInputProps> = ({
@@ -13,76 +14,87 @@ const FormInput: React.FC<FormInputProps> = ({
   error,
   touched,
   isPassword = false,
+  icon,
+  onFocus,
+  onBlur,
   ...inputProps
 }) => {
   const [showPassword, setShowPassword] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
   const hasError = touched && !!error;
+
+  const borderColor = hasError ? '#EF4444' : isFocused ? '#6366F1' : '#E2E8F0';
+  const bgColor = hasError ? '#FEF2F2' : isFocused ? '#FAFBFF' : '#F8FAFC';
 
   return (
     <View style={styles.container}>
       <Text style={styles.label}>{label}</Text>
-      <View style={[styles.inputWrapper, hasError && styles.inputError]}>
+      <View style={[styles.inputWrapper, { borderColor, backgroundColor: bgColor }]}>
+        {icon ? <Text style={styles.icon}>{icon}</Text> : null}
         <TextInput
           style={styles.input}
-          placeholderTextColor="#9CA3AF"
+          placeholderTextColor="#94A3B8"
           secureTextEntry={isPassword && !showPassword}
           autoCapitalize="none"
+          onFocus={e => {
+            setIsFocused(true);
+            onFocus?.(e);
+          }}
+          onBlur={e => {
+            setIsFocused(false);
+            onBlur?.(e);
+          }}
           {...inputProps}
         />
         {isPassword && (
-          <TouchableOpacity onPress={() => setShowPassword(prev => !prev)} style={styles.eyeButton}>
-            <Text style={styles.eyeText}>{showPassword ? 'Hide' : 'Show'}</Text>
+          <TouchableOpacity
+            onPress={() => setShowPassword(prev => !prev)}
+            style={styles.eyeButton}
+            hitSlop={8}
+          >
+            <Text style={styles.eyeText}>{showPassword ? '🙈' : '👁'}</Text>
           </TouchableOpacity>
         )}
       </View>
-      {hasError && <Text style={styles.errorText}>{error}</Text>}
+      {hasError && (
+        <View style={styles.errorRow}>
+          <Text style={styles.errorIcon}>⚠</Text>
+          <Text style={styles.errorText}>{error}</Text>
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    marginBottom: 16,
-  },
+  container: { marginBottom: 18 },
   label: {
-    fontSize: 14,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
     color: '#374151',
-    marginBottom: 6,
+    marginBottom: 7,
+    letterSpacing: 0.1,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: '#D1D5DB',
-    borderRadius: 10,
-    backgroundColor: '#F9FAFB',
+    borderRadius: 14,
     paddingHorizontal: 14,
+    minHeight: 52,
   },
-  inputError: {
-    borderColor: '#EF4444',
-    backgroundColor: '#FEF2F2',
-  },
+  icon: { fontSize: 17, marginRight: 10 },
   input: {
     flex: 1,
-    height: 50,
     fontSize: 15,
-    color: '#111827',
+    color: '#0F172A',
+    paddingVertical: 12,
   },
-  eyeButton: {
-    paddingLeft: 10,
-    paddingVertical: 4,
-  },
-  eyeText: {
-    fontSize: 13,
-    color: '#6366F1',
-    fontWeight: '600',
-  },
-  errorText: {
-    marginTop: 5,
-    fontSize: 12,
-    color: '#EF4444',
-  },
+  eyeButton: { paddingLeft: 10, paddingVertical: 4 },
+  eyeText: { fontSize: 16 },
+  errorRow: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 5 },
+  errorIcon: { fontSize: 11, color: '#EF4444' },
+  errorText: { fontSize: 12, color: '#EF4444', flex: 1 },
 });
 
 export default FormInput;

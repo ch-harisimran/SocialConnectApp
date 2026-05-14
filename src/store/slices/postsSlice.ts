@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { mockPostsService, Post } from '../../services/mockPosts';
 import { notificationService } from '../../services/notificationService';
+import { showToast } from './uiSlice';
 import type { RootState } from '../index';
 
 interface PostsState {
@@ -46,7 +47,7 @@ export const createPost = createAsyncThunk(
 
 export const toggleLike = createAsyncThunk(
   'posts/toggleLike',
-  async (postId: string, { getState }) => {
+  async (postId: string, { getState, dispatch }) => {
     const state = getState() as RootState;
     const { auth, posts, settings } = state;
     if (!auth.user) throw new Error('Not authenticated.');
@@ -55,11 +56,14 @@ export const toggleLike = createAsyncThunk(
     const updated = await mockPostsService.toggleLike(postId, auth.user.id);
 
     const isLiking = updated.likes.includes(auth.user.id);
-    if (settings.notificationsEnabled && post && post.authorId !== auth.user.id && isLiking) {
-      notificationService.scheduleLocalNotification(
-        '❤️ New Like',
-        `${auth.user.name} liked ${post.authorName}'s post`
-      );
+    if (isLiking && post) {
+      dispatch(showToast({ icon: '❤️', message: `You liked ${post.authorName}'s post!`, type: 'like' }));
+      if (settings.notificationsEnabled) {
+        notificationService.scheduleLocalNotification(
+          '❤️ New Like',
+          `You liked ${post.authorName}'s post`
+        );
+      }
     }
 
     return updated;
@@ -68,7 +72,7 @@ export const toggleLike = createAsyncThunk(
 
 export const addComment = createAsyncThunk(
   'posts/addComment',
-  async ({ postId, text }: { postId: string; text: string }, { getState }) => {
+  async ({ postId, text }: { postId: string; text: string }, { getState, dispatch }) => {
     const state = getState() as RootState;
     const { auth, posts, settings } = state;
     if (!auth.user) throw new Error('Not authenticated.');
@@ -80,12 +84,12 @@ export const addComment = createAsyncThunk(
       text
     );
 
-    if (settings.notificationsEnabled && post && post.authorId !== auth.user.id) {
-      const preview = text.length > 50 ? `${text.slice(0, 50)}…` : text;
-      notificationService.scheduleLocalNotification(
-        '💬 New Comment',
-        `${auth.user.name} commented on ${post.authorName}'s post: "${preview}"`
-      );
+    if (post) {
+      const preview = text.length > 40 ? `${text.slice(0, 40)}…` : text;
+      dispatch(showToast({ icon: '💬', message: `Comment posted: "${preview}"`, type: 'comment' }));
+      if (settings.notificationsEnabled) {
+        notificationService.scheduleLocalNotification('💬 Comment Posted', `"${preview}"`);
+      }
     }
 
     return updated;

@@ -116,13 +116,22 @@ export const mockAuth = {
     return { id: user.id, name: user.name, bio: user.bio, avatar: user.avatar };
   },
 
-  async forgotPassword(email: string): Promise<void> {
+  async verifyEmailForReset(email: string): Promise<void> {
     const users = await getUsers();
     const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
     if (!user) {
       throw new Error('No account found with this email address.');
     }
-    await new Promise(resolve => setTimeout(resolve, 800));
+  },
+
+  async resetPassword(email: string, newPassword: string): Promise<void> {
+    const users = await getUsers();
+    const index = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+    if (index === -1) {
+      throw new Error('No account found with this email address.');
+    }
+    users[index] = { ...users[index], password: newPassword };
+    await saveUsers(users);
   },
 
   async logout(): Promise<void> {

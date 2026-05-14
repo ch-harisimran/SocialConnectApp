@@ -9,17 +9,11 @@ import {
   RefreshControl,
   ActivityIndicator,
   Alert,
+  Animated,
+  ScrollView,
+  Pressable,
 } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withSequence,
-  withTiming,
-  withDelay,
-  withRepeat,
-} from 'react-native-reanimated';
-
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { usePosts } from '../../context/PostsContext';
@@ -28,6 +22,7 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { clearNewActivity } from '../../store/slices/postsSlice';
 import { formatTimeAgo } from '../../utils/formatTime';
 import { rf, rw, rh } from '../../utils/responsive';
+import { useTheme } from '../../utils/theme';
 import { Post } from '../../services/mockPosts';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import AnimatedHeartButton from '../../components/AnimatedHeartButton';
@@ -35,16 +30,19 @@ import AnimatedHeartButton from '../../components/AnimatedHeartButton';
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'Home'>;
 
 // ─── LiveBadge ────────────────────────────────────────────────────────────────
-
 const LiveBadge: React.FC<{ lastSyncedAt: number | null }> = ({ lastSyncedAt }) => {
-  const pulse = useSharedValue(1);
+  const pulse = useRef(new Animated.Value(1)).current;
   const [, tick] = useState(0);
 
   useEffect(() => {
-    pulse.value = withRepeat(
-      withSequence(withTiming(0.3, { duration: 900 }), withTiming(1, { duration: 900 })),
-      -1
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulse, { toValue: 0.2, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulse, { toValue: 1, duration: 800, useNativeDriver: true }),
+      ])
     );
+    loop.start();
+    return () => loop.stop();
   }, [pulse]);
 
   useEffect(() => {
@@ -52,64 +50,83 @@ const LiveBadge: React.FC<{ lastSyncedAt: number | null }> = ({ lastSyncedAt }) 
     return () => clearInterval(interval);
   }, []);
 
-  const dotStyle = useAnimatedStyle(() => ({ opacity: pulse.value }));
   const timeLabel = lastSyncedAt ? formatTimeAgo(new Date(lastSyncedAt).toISOString()) : null;
 
   return (
-    <View style={liveBadgeStyles.container}>
-      <Animated.View style={[liveBadgeStyles.dot, dotStyle]} />
-      <Text style={liveBadgeStyles.text}>LIVE{timeLabel ? ` · ${timeLabel}` : ''}</Text>
+    <View style={liveStyles.wrap}>
+      <Animated.View style={[liveStyles.dot, { opacity: pulse }]} />
+      <Text style={liveStyles.text}>LIVE{timeLabel ? ` · ${timeLabel}` : ''}</Text>
     </View>
   );
 };
-
-const liveBadgeStyles = StyleSheet.create({
-  container: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+const liveStyles = StyleSheet.create({
+  wrap: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    backgroundColor: 'rgba(34,197,94,0.13)', paddingHorizontal: 9,
+    paddingVertical: 4, borderRadius: 20,
+  },
   dot: { width: 7, height: 7, borderRadius: 3.5, backgroundColor: '#22C55E' },
-  text: { fontSize: rf(1.2), fontWeight: '700', color: '#22C55E', letterSpacing: 0.4 },
+  text: { fontSize: 10, fontWeight: '800', color: '#22C55E', letterSpacing: 0.6 },
 });
 
 // ─── NewActivityBanner ────────────────────────────────────────────────────────
-
 const NewActivityBanner: React.FC<{ onPress: () => void }> = ({ onPress }) => {
-  const slideY = useSharedValue(-40);
-
+  const slideY = useRef(new Animated.Value(-60)).current;
   useEffect(() => {
-    slideY.value = withSpring(0, { damping: 10, stiffness: 80 });
+    Animated.spring(slideY, { toValue: 0, damping: 12, stiffness: 90, useNativeDriver: true }).start();
   }, [slideY]);
-
-  const bannerAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: slideY.value }],
-  }));
-
   return (
-    <Animated.View style={[bannerStyles.wrapper, bannerAnimStyle]}>
-      <TouchableOpacity style={bannerStyles.banner} onPress={onPress} activeOpacity={0.85}>
-        <Text style={bannerStyles.text}>✦ New activity — tap to refresh</Text>
+    <Animated.View style={[bannerStyles.wrap, { transform: [{ translateY: slideY }] }]}>
+      <TouchableOpacity style={bannerStyles.pill} onPress={onPress} activeOpacity={0.85}>
+        <Text style={bannerStyles.text}>✦  New activity — tap to refresh</Text>
       </TouchableOpacity>
     </Animated.View>
   );
 };
-
 const bannerStyles = StyleSheet.create({
-  wrapper: { position: 'absolute', top: 0, left: 0, right: 0, zIndex: 10, alignItems: 'center' },
-  banner: {
-    marginTop: rh(1),
-    backgroundColor: '#6366F1',
-    paddingVertical: rh(1),
-    paddingHorizontal: rw(5.3),
-    borderRadius: 20,
-    elevation: 4,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
+  wrap: { position: 'absolute', top: 10, left: 0, right: 0, zIndex: 20, alignItems: 'center' },
+  pill: {
+    backgroundColor: '#6366F1', paddingVertical: 10, paddingHorizontal: 22,
+    borderRadius: 28, elevation: 8,
+    shadowColor: '#6366F1', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.45, shadowRadius: 10,
   },
-  text: { color: '#fff', fontWeight: '700', fontSize: rf(1.5) },
+  text: { color: '#fff', fontWeight: '800', fontSize: rf(1.45), letterSpacing: 0.2 },
+});
+
+// ─── StoryBubble ─────────────────────────────────────────────────────────────
+const STORIES = [
+  { id: 'add', label: 'Your Story', initials: '+', color: '#6366F1', isAdd: true },
+  { id: '1', label: 'Alex', initials: 'AL', color: '#EC4899' },
+  { id: '2', label: 'Jordan', initials: 'JO', color: '#F59E0B' },
+  { id: '3', label: 'Sam', initials: 'SA', color: '#10B981' },
+  { id: '4', label: 'Morgan', initials: 'MO', color: '#8B5CF6' },
+  { id: '5', label: 'Riley', initials: 'RI', color: '#EF4444' },
+];
+
+const StoryBubble: React.FC<{ item: typeof STORIES[0]; theme: ReturnType<typeof useTheme> }> = ({ item, theme }) => (
+  <TouchableOpacity style={storyStyles.wrap} activeOpacity={0.75}>
+    <View style={[storyStyles.ring, { borderColor: item.isAdd ? 'transparent' : item.color }]}>
+      <View style={[storyStyles.circle, { backgroundColor: item.isAdd ? theme.accentLight : item.color }]}>
+        <Text style={[storyStyles.initials, { color: item.isAdd ? theme.accent : '#fff' }]}>
+          {item.initials}
+        </Text>
+      </View>
+    </View>
+    <Text style={[storyStyles.label, { color: theme.subtext }]} numberOfLines={1}>
+      {item.label}
+    </Text>
+  </TouchableOpacity>
+);
+const storyStyles = StyleSheet.create({
+  wrap: { alignItems: 'center', marginRight: 14, width: 62 },
+  ring: { width: 60, height: 60, borderRadius: 30, borderWidth: 2.5, padding: 2.5, marginBottom: 5 },
+  circle: { flex: 1, borderRadius: 26, alignItems: 'center', justifyContent: 'center' },
+  initials: { fontSize: 17, fontWeight: '800' },
+  label: { fontSize: 11, fontWeight: '500' },
 });
 
 // ─── PostCard ─────────────────────────────────────────────────────────────────
-
 interface PostCardProps {
   post: Post;
   index: number;
@@ -122,133 +139,200 @@ interface PostCardProps {
 
 const PostCard = memo<PostCardProps>(
   ({ post, index, currentUserId, onLike, onComment, onDelete, onViewProfile }) => {
+    const t = useTheme();
     const liked = post.likes.includes(currentUserId);
     const isOwner = post.authorId === currentUserId;
     const initials = post.authorName.slice(0, 2).toUpperCase();
 
-    // Staggered entrance animation (first 6 items only)
-    const opacity = useSharedValue(index < 6 ? 0 : 1);
-    const translateY = useSharedValue(index < 6 ? 24 : 0);
+    const opacity = useRef(new Animated.Value(index < 6 ? 0 : 1)).current;
+    const translateY = useRef(new Animated.Value(index < 6 ? 32 : 0)).current;
 
     useEffect(() => {
       if (index < 6) {
-        const delay = index * 70;
-        opacity.value = withDelay(delay, withTiming(1, { duration: 280 }));
-        translateY.value = withDelay(delay, withSpring(0, { damping: 16 }));
+        Animated.sequence([
+          Animated.delay(index * 70),
+          Animated.parallel([
+            Animated.timing(opacity, { toValue: 1, duration: 280, useNativeDriver: true }),
+            Animated.spring(translateY, { toValue: 0, damping: 16, stiffness: 110, useNativeDriver: true }),
+          ]),
+        ]).start();
       }
-      // Run once on mount only
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const cardAnimStyle = useAnimatedStyle(() => ({
-      opacity: opacity.value,
-      transform: [{ translateY: translateY.value }],
-    }));
-
-    const confirmDelete = () => {
-      Alert.alert('Delete post', 'Are you sure you want to delete this post?', [
+    const confirmDelete = () =>
+      Alert.alert('Delete post', 'This cannot be undone.', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Delete', style: 'destructive', onPress: () => onDelete(post.id) },
       ]);
-    };
+
+    // Pick a consistent accent hue per author
+    const accentColors = ['#6366F1', '#EC4899', '#F59E0B', '#10B981', '#8B5CF6', '#EF4444', '#06B6D4'];
+    const colorIdx = post.authorId.charCodeAt(0) % accentColors.length;
+    const authorColor = accentColors[colorIdx];
 
     return (
-      <Animated.View style={[styles.card, cardAnimStyle]}>
-        <TouchableOpacity
-          style={styles.cardHeader}
-          onPress={() => onViewProfile(post.authorId, post.authorName)}
-          activeOpacity={0.7}
-        >
-          {post.authorAvatar ? (
-            <Image source={{ uri: post.authorAvatar }} style={styles.avatarImage} />
-          ) : (
-            <View style={styles.avatarCircle}>
-              <Text style={styles.avatarText}>{initials}</Text>
-            </View>
-          )}
-          <View style={styles.authorInfo}>
-            <Text style={styles.authorName}>{post.authorName}</Text>
-            <Text style={styles.postTime}>{formatTimeAgo(post.createdAt)}</Text>
-          </View>
-          {isOwner && (
-            <TouchableOpacity
-              onPress={e => {
-                e.stopPropagation();
-                confirmDelete();
-              }}
-              style={styles.deleteBtn}
-              hitSlop={8}
-            >
-              <Text style={styles.deleteBtnText}>⋯</Text>
-            </TouchableOpacity>
-          )}
-        </TouchableOpacity>
+      <Animated.View
+        style={[
+          cardStyles.card,
+          { backgroundColor: t.card, borderColor: t.border, shadowColor: t.shadow, opacity, transform: [{ translateY }] },
+        ]}
+      >
+        {/* Colored top accent strip */}
+        <View style={[cardStyles.topStrip, { backgroundColor: authorColor }]} />
 
-        <Text style={styles.postContent}>{post.content}</Text>
+        {/* Header */}
+        <View style={cardStyles.header}>
+          <TouchableOpacity
+            style={cardStyles.authorRow}
+            onPress={() => onViewProfile(post.authorId, post.authorName)}
+            activeOpacity={0.75}
+          >
+            <View style={[cardStyles.avatarRing, { borderColor: authorColor }]}>
+              {post.authorAvatar ? (
+                <Image source={{ uri: post.authorAvatar }} style={cardStyles.avatarImg} />
+              ) : (
+                <View style={[cardStyles.avatarCircle, { backgroundColor: authorColor }]}>
+                  <Text style={cardStyles.avatarText}>{initials}</Text>
+                </View>
+              )}
+            </View>
+            <View style={cardStyles.authorMeta}>
+              <Text style={[cardStyles.authorName, { color: t.text }]}>{post.authorName}</Text>
+              <Text style={[cardStyles.postTime, { color: t.subtext }]}>{formatTimeAgo(post.createdAt)}</Text>
+            </View>
+          </TouchableOpacity>
+
+          {isOwner && (
+            <Pressable onPress={confirmDelete} style={cardStyles.menuBtn} hitSlop={10}>
+              <Text style={[cardStyles.menuIcon, { color: t.subtext }]}>•••</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {/* Content */}
+        <Text style={[cardStyles.content, { color: t.text }]}>{post.content}</Text>
 
         {post.imageUri ? (
-          <Image source={{ uri: post.imageUri }} style={styles.postImage} resizeMode="cover" />
+          <Image source={{ uri: post.imageUri }} style={cardStyles.image} resizeMode="cover" />
         ) : null}
 
-        <View style={styles.cardFooter}>
-          <AnimatedHeartButton
-            liked={liked}
-            count={post.likes.length}
-            onPress={() => onLike(post.id)}
-          />
+        {/* Actions */}
+        <View style={[cardStyles.footer, { borderTopColor: t.border }]}>
+          <AnimatedHeartButton liked={liked} count={post.likes.length} onPress={() => onLike(post.id)} />
+
           <TouchableOpacity
-            style={styles.actionBtn}
+            style={[cardStyles.actionChip, { backgroundColor: t.inputBg }]}
             onPress={() => onComment(post.id)}
             activeOpacity={0.7}
           >
-            <Text style={styles.actionText}>💬 {post.comments.length}</Text>
+            <Text style={cardStyles.actionEmoji}>💬</Text>
+            <Text style={[cardStyles.actionLabel, { color: t.subtext }]}>{post.comments.length}</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionBtn}>
-            <Text style={styles.actionText}>↗ Share</Text>
+
+          <TouchableOpacity
+            style={[cardStyles.actionChip, { backgroundColor: t.inputBg }]}
+            activeOpacity={0.7}
+          >
+            <Text style={cardStyles.actionEmoji}>↗</Text>
+            <Text style={[cardStyles.actionLabel, { color: t.subtext }]}>Share</Text>
           </TouchableOpacity>
         </View>
       </Animated.View>
     );
   },
-  (prev, next) =>
-    prev.post === next.post &&
-    prev.currentUserId === next.currentUserId &&
-    prev.onLike === next.onLike &&
-    prev.onComment === next.onComment &&
-    prev.onDelete === next.onDelete &&
-    prev.onViewProfile === next.onViewProfile
+  (p, n) =>
+    p.post === n.post && p.currentUserId === n.currentUserId &&
+    p.onLike === n.onLike && p.onComment === n.onComment &&
+    p.onDelete === n.onDelete && p.onViewProfile === n.onViewProfile
 );
 PostCard.displayName = 'PostCard';
 
-const EmptyFeed: React.FC<{ onCreatePost: () => void }> = ({ onCreatePost }) => (
-  <View style={styles.emptyContainer}>
-    <Text style={styles.emptyIcon}>📝</Text>
-    <Text style={styles.emptyTitle}>No posts yet</Text>
-    <Text style={styles.emptySubtitle}>Be the first to share something with the community.</Text>
-    <TouchableOpacity style={styles.emptyButton} onPress={onCreatePost} activeOpacity={0.8}>
-      <Text style={styles.emptyButtonText}>Create First Post</Text>
-    </TouchableOpacity>
-  </View>
-);
+const cardStyles = StyleSheet.create({
+  card: {
+    borderRadius: 20, marginBottom: rh(1.6), borderWidth: StyleSheet.hairlineWidth,
+    overflow: 'hidden',
+    shadowOffset: { width: 0, height: 3 }, shadowOpacity: 0.09, shadowRadius: 10, elevation: 4,
+  },
+  topStrip: { height: 3, width: '100%' },
+  header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: rw(4), paddingTop: rh(1.4), paddingBottom: rh(0.8) },
+  authorRow: { flexDirection: 'row', alignItems: 'center', flex: 1, gap: rw(2.5) },
+  avatarRing: { width: rw(11.5), height: rw(11.5), borderRadius: rw(5.75), borderWidth: 2, padding: 1.5 },
+  avatarImg: { flex: 1, borderRadius: rw(5.25) },
+  avatarCircle: { flex: 1, borderRadius: rw(5.25), alignItems: 'center', justifyContent: 'center' },
+  avatarText: { fontSize: rf(1.55), fontWeight: '800', color: '#fff' },
+  authorMeta: { flex: 1 },
+  authorName: { fontSize: rf(1.65), fontWeight: '800' },
+  postTime: { fontSize: rf(1.25), marginTop: 1 },
+  menuBtn: { padding: 4 },
+  menuIcon: { fontSize: 13, letterSpacing: 1 },
+  content: { fontSize: rf(1.6), lineHeight: 24, paddingHorizontal: rw(4), paddingBottom: rh(1.2) },
+  image: { width: '100%', height: rh(26), marginBottom: rh(1.2) },
+  footer: {
+    flexDirection: 'row', borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: rw(4), paddingVertical: rh(1.1), gap: rw(2.5),
+  },
+  actionChip: {
+    flexDirection: 'row', alignItems: 'center', gap: 5,
+    paddingHorizontal: 11, paddingVertical: 6, borderRadius: 20,
+  },
+  actionEmoji: { fontSize: 14 },
+  actionLabel: { fontSize: rf(1.4), fontWeight: '600' },
+});
+
+// ─── EmptyFeed ────────────────────────────────────────────────────────────────
+const EmptyFeed: React.FC<{ onCreatePost: () => void }> = ({ onCreatePost }) => {
+  const t = useTheme();
+  return (
+    <View style={emptyStyles.wrap}>
+      <View style={[emptyStyles.iconRing, { borderColor: t.border }]}>
+        <Text style={emptyStyles.icon}>✍️</Text>
+      </View>
+      <Text style={[emptyStyles.title, { color: t.text }]}>Nothing here yet</Text>
+      <Text style={[emptyStyles.sub, { color: t.subtext }]}>
+        Be the first to share something with the community.
+      </Text>
+      <TouchableOpacity
+        style={[emptyStyles.btn, { backgroundColor: t.accent }]}
+        onPress={onCreatePost}
+        activeOpacity={0.85}
+      >
+        <Text style={emptyStyles.btnText}>✦  Write your first post</Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
+const emptyStyles = StyleSheet.create({
+  wrap: { flex: 1, alignItems: 'center', paddingTop: rh(8), paddingHorizontal: rw(10) },
+  iconRing: {
+    width: 90, height: 90, borderRadius: 45, borderWidth: 2,
+    alignItems: 'center', justifyContent: 'center', marginBottom: rh(2.5),
+  },
+  icon: { fontSize: 38 },
+  title: { fontSize: rf(2.2), fontWeight: '800', marginBottom: rh(1), letterSpacing: -0.3 },
+  sub: { fontSize: rf(1.6), textAlign: 'center', lineHeight: 22, marginBottom: rh(3.5) },
+  btn: {
+    paddingVertical: rh(1.6), paddingHorizontal: rw(8), borderRadius: 28,
+    shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6,
+  },
+  btnText: { color: '#fff', fontWeight: '800', fontSize: rf(1.6), letterSpacing: 0.2 },
+});
 
 // ─── HomeScreen ───────────────────────────────────────────────────────────────
-
 const HomeScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
+  const insets = useSafeAreaInsets();
+  const t = useTheme();
   const { user } = useAuth();
   const { posts, isLoading, isRefreshing, refreshPosts, toggleLike, deletePost } = usePosts();
   const dispatch = useAppDispatch();
-  const lastSyncedAt = useAppSelector(state => state.posts.lastSyncedAt);
-  const hasNewActivity = useAppSelector(state => state.posts.hasNewActivity);
-  const postsError = useAppSelector(state => state.posts.error);
+  const lastSyncedAt = useAppSelector(s => s.posts.lastSyncedAt);
+  const hasNewActivity = useAppSelector(s => s.posts.hasNewActivity);
+  const postsError = useAppSelector(s => s.posts.error);
 
   const listRef = useRef<FlatList>(null);
-
-  // FAB scale animation
-  const fabScale = useSharedValue(1);
-  const fabAnimStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: fabScale.value }],
-  }));
+  const fabScale = useRef(new Animated.Value(1)).current;
+  const fabRotate = useRef(new Animated.Value(0)).current;
 
   const handleLike = useCallback((id: string) => toggleLike(id), [toggleLike]);
   const handleDelete = useCallback((id: string) => deletePost(id), [deletePost]);
@@ -262,10 +346,18 @@ const HomeScreen: React.FC = () => {
     [navigation]
   );
   const handleCreatePost = useCallback(() => {
-    // eslint-disable-next-line react-hooks/immutability
-    fabScale.value = withSequence(withSpring(0.85, { damping: 5 }), withSpring(1, { damping: 8 }));
+    Animated.sequence([
+      Animated.parallel([
+        Animated.spring(fabScale, { toValue: 0.78, damping: 4, useNativeDriver: true }),
+        Animated.timing(fabRotate, { toValue: 1, duration: 150, useNativeDriver: true }),
+      ]),
+      Animated.parallel([
+        Animated.spring(fabScale, { toValue: 1, damping: 8, useNativeDriver: true }),
+        Animated.timing(fabRotate, { toValue: 0, duration: 150, useNativeDriver: true }),
+      ]),
+    ]).start();
     navigation.navigate('CreatePost');
-  }, [fabScale, navigation]);
+  }, [fabScale, fabRotate, navigation]);
 
   const handleNewActivityPress = useCallback(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
@@ -273,96 +365,138 @@ const HomeScreen: React.FC = () => {
   }, [dispatch]);
 
   const initials = user?.name?.slice(0, 2).toUpperCase() ?? 'U';
+  const fabSpin = fabRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] });
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6366F1" />
+      <View style={[styles.center, { backgroundColor: t.bg }]}>
+        <ActivityIndicator size="large" color={t.accent} />
+        <Text style={[styles.loadingLabel, { color: t.subtext }]}>Loading feed…</Text>
       </View>
     );
   }
 
   if (postsError && posts.length === 0) {
     return (
-      <View style={styles.loadingContainer}>
-        <Text style={styles.errorText}>{"Couldn't load posts.\nPull down to try again."}</Text>
-        <TouchableOpacity style={styles.retryBtn} onPress={refreshPosts} activeOpacity={0.8}>
-          <Text style={styles.retryBtnText}>Retry</Text>
+      <View style={[styles.center, { backgroundColor: t.bg }]}>
+        <Text style={styles.errorIcon}>⚠️</Text>
+        <Text style={[styles.errorText, { color: t.subtext }]}>Couldn't load posts.</Text>
+        <TouchableOpacity style={[styles.retryBtn, { backgroundColor: t.accent }]} onPress={refreshPosts}>
+          <Text style={styles.retryText}>Try Again</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Social Connect</Text>
-        <LiveBadge lastSyncedAt={lastSyncedAt} />
-        {user?.avatar ? (
-          <Image source={{ uri: user.avatar }} style={styles.headerAvatar} />
-        ) : (
-          <View style={styles.headerAvatarCircle}>
-            <Text style={styles.headerAvatarText}>{initials}</Text>
+    <View style={[styles.root, { backgroundColor: t.bg }]}>
+      {/* ── Header ── */}
+      <View style={[styles.header, { backgroundColor: t.header, borderBottomColor: t.border, paddingTop: insets.top + 8 }]}>
+        <View style={styles.headerLeft}>
+          <View style={[styles.logoBox, { backgroundColor: t.accent }]}>
+            <Text style={styles.logoText}>SC</Text>
           </View>
-        )}
+          <View>
+            <Text style={[styles.headerBrand, { color: t.text }]}>Social Connect</Text>
+            <LiveBadge lastSyncedAt={lastSyncedAt} />
+          </View>
+        </View>
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={[styles.headerBtn, { backgroundColor: t.inputBg }]}
+            onPress={handleCreatePost}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.headerBtnIcon, { color: t.accent }]}>✏️</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('UserProfile', { userId: user?.id ?? '', userName: user?.name ?? '' })}
+            activeOpacity={0.8}
+          >
+            {user?.avatar ? (
+              <Image source={{ uri: user.avatar }} style={[styles.headerAvatar, { borderColor: t.accent }]} />
+            ) : (
+              <View style={[styles.headerAvatarCircle, { backgroundColor: t.accent }]}>
+                <Text style={styles.headerAvatarText}>{initials}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
       </View>
 
       <FlatList
         ref={listRef}
         data={posts}
         keyExtractor={item => item.id}
-        renderItem={({ item, index }) => (
-          <PostCard
-            post={item}
-            index={index}
-            currentUserId={user?.id ?? ''}
-            onLike={handleLike}
-            onComment={handleComment}
-            onDelete={handleDelete}
-            onViewProfile={handleViewProfile}
-          />
-        )}
-        ListHeaderComponent={
-          <TouchableOpacity
-            style={styles.composerBar}
-            onPress={handleCreatePost}
-            activeOpacity={0.7}
-          >
-            {user?.avatar ? (
-              <Image source={{ uri: user.avatar }} style={styles.composerAvatar} />
-            ) : (
-              <View style={styles.composerAvatarCircle}>
-                <Text style={styles.composerAvatarText}>{initials}</Text>
-              </View>
-            )}
-            <Text style={styles.composerPlaceholder}>{"What's on your mind?"}</Text>
-            <View style={styles.composerPhotoBtn}>
-              <Text style={styles.composerPhotoIcon}>🖼</Text>
-            </View>
-          </TouchableOpacity>
-        }
-        ListEmptyComponent={<EmptyFeed onCreatePost={handleCreatePost} />}
-        contentContainerStyle={styles.feed}
         showsVerticalScrollIndicator={false}
         removeClippedSubviews
         maxToRenderPerBatch={5}
-        initialNumToRender={8}
+        initialNumToRender={6}
         windowSize={10}
+        contentContainerStyle={[styles.feed, { paddingBottom: rh(12) }]}
         refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={refreshPosts}
-            colors={['#6366F1']}
-            tintColor="#6366F1"
-          />
+          <RefreshControl refreshing={isRefreshing} onRefresh={refreshPosts}
+            colors={[t.accent]} tintColor={t.accent} />
         }
+        ListHeaderComponent={
+          <>
+            {/* Stories strip */}
+            <View style={[styles.storiesCard, { backgroundColor: t.card, borderColor: t.border }]}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesRow}>
+                {STORIES.map(s => <StoryBubble key={s.id} item={s} theme={t} />)}
+              </ScrollView>
+            </View>
+
+            {/* Composer */}
+            <TouchableOpacity
+              style={[styles.composer, { backgroundColor: t.card, borderColor: t.border }]}
+              onPress={handleCreatePost}
+              activeOpacity={0.7}
+            >
+              {user?.avatar ? (
+                <Image source={{ uri: user.avatar }} style={[styles.composerAvatar, { borderColor: t.border }]} />
+              ) : (
+                <View style={[styles.composerAvatarCircle, { backgroundColor: t.accent }]}>
+                  <Text style={styles.composerAvatarText}>{initials}</Text>
+                </View>
+              )}
+              <Text style={[styles.composerHint, { color: t.placeholder }]}>
+                What's on your mind, {user?.name?.split(' ')[0] ?? 'there'}?
+              </Text>
+              <View style={styles.composerIcons}>
+                <Text style={styles.composerIcon}>🖼</Text>
+              </View>
+            </TouchableOpacity>
+
+            {posts.length > 0 && (
+              <View style={styles.feedLabel}>
+                <View style={[styles.feedLabelLine, { backgroundColor: t.border }]} />
+                <Text style={[styles.feedLabelText, { color: t.subtext }]}>Recent Posts</Text>
+                <View style={[styles.feedLabelLine, { backgroundColor: t.border }]} />
+              </View>
+            )}
+          </>
+        }
+        ListEmptyComponent={<EmptyFeed onCreatePost={handleCreatePost} />}
+        renderItem={({ item, index }) => (
+          <PostCard
+            post={item} index={index} currentUserId={user?.id ?? ''}
+            onLike={handleLike} onComment={handleComment}
+            onDelete={handleDelete} onViewProfile={handleViewProfile}
+          />
+        )}
       />
 
       {hasNewActivity && <NewActivityBanner onPress={handleNewActivityPress} />}
 
-      <Animated.View style={[styles.fabWrapper, fabAnimStyle]}>
-        <TouchableOpacity style={styles.fab} onPress={handleCreatePost} activeOpacity={0.85}>
-          <Text style={styles.fabIcon}>+</Text>
+      {/* FAB */}
+      <Animated.View style={[styles.fabWrap, { transform: [{ scale: fabScale }] }]}>
+        <TouchableOpacity
+          style={[styles.fab, { backgroundColor: t.accent }]}
+          onPress={handleCreatePost}
+          activeOpacity={0.85}
+        >
+          <Animated.Text style={[styles.fabIcon, { transform: [{ rotate: fabSpin }] }]}>+</Animated.Text>
         </TouchableOpacity>
       </Animated.View>
     </View>
@@ -370,153 +504,85 @@ const HomeScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F3F4F6' },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#F3F4F6',
-  },
-  errorText: {
-    fontSize: rf(1.7),
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 24,
-    marginBottom: rh(2.5),
-  },
-  retryBtn: {
-    backgroundColor: '#6366F1',
-    paddingVertical: rh(1.4),
-    paddingHorizontal: rw(8),
-    borderRadius: 24,
-  },
-  retryBtnText: { color: '#fff', fontWeight: '700', fontSize: rf(1.6) },
+  root: { flex: 1 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  loadingLabel: { fontSize: rf(1.5), marginTop: 12 },
+  errorIcon: { fontSize: 40, marginBottom: 12 },
+  errorText: { fontSize: rf(1.7), marginBottom: 20 },
+  retryBtn: { paddingVertical: 12, paddingHorizontal: 32, borderRadius: 24 },
+  retryText: { color: '#fff', fontWeight: '700', fontSize: rf(1.6) },
+
+  // Header
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#fff',
-    paddingHorizontal: rw(4.3),
-    paddingVertical: rh(1.7),
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: rw(4.5), paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.07, shadowRadius: 6, elevation: 4,
   },
-  headerTitle: { fontSize: rf(2.2), fontWeight: '800', color: '#6366F1' },
-  headerAvatar: { width: rw(9.6), height: rw(9.6), borderRadius: rw(4.8) },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  logoBox: {
+    width: 36, height: 36, borderRadius: 10,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#6366F1', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.4, shadowRadius: 4, elevation: 4,
+  },
+  logoText: { fontSize: 12, fontWeight: '900', color: '#fff', letterSpacing: -0.5 },
+  headerBrand: { fontSize: rf(2.1), fontWeight: '900', letterSpacing: -0.6, marginBottom: 1 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  headerBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+  headerBtnIcon: { fontSize: 17 },
+  headerAvatar: { width: rw(9.5), height: rw(9.5), borderRadius: rw(4.75), borderWidth: 2 },
   headerAvatarCircle: {
-    width: rw(9.6),
-    height: rw(9.6),
-    borderRadius: rw(4.8),
-    backgroundColor: '#6366F1',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: rw(9.5), height: rw(9.5), borderRadius: rw(4.75),
+    alignItems: 'center', justifyContent: 'center',
   },
-  headerAvatarText: { color: '#fff', fontWeight: '700', fontSize: rf(1.5) },
-  composerBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    marginHorizontal: rw(3.2),
-    marginTop: rh(1.5),
-    marginBottom: rh(0.5),
-    borderRadius: 12,
-    padding: rw(3.2),
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    gap: rw(2.7),
+  headerAvatarText: { color: '#fff', fontWeight: '800', fontSize: rf(1.5) },
+
+  // Feed
+  feed: { paddingHorizontal: rw(3.5), paddingTop: 0 },
+
+  // Stories
+  storiesCard: {
+    borderRadius: 18, marginTop: rh(1.5), marginBottom: rh(1.2),
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
   },
-  composerAvatar: { width: rw(10.1), height: rw(10.1), borderRadius: rw(5.1) },
+  storiesRow: { paddingHorizontal: 14, paddingVertical: 14 },
+
+  // Composer
+  composer: {
+    flexDirection: 'row', alignItems: 'center', gap: rw(3),
+    borderRadius: 18, paddingHorizontal: rw(4), paddingVertical: rh(1.5),
+    marginBottom: rh(1.5), borderWidth: StyleSheet.hairlineWidth,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05, shadowRadius: 4, elevation: 2,
+  },
+  composerAvatar: { width: rw(10), height: rw(10), borderRadius: rw(5), borderWidth: 1.5 },
   composerAvatarCircle: {
-    width: rw(10.1),
-    height: rw(10.1),
-    borderRadius: rw(5.1),
-    backgroundColor: '#6366F1',
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: rw(10), height: rw(10), borderRadius: rw(5),
+    alignItems: 'center', justifyContent: 'center',
   },
-  composerAvatarText: { color: '#fff', fontWeight: '700', fontSize: rf(1.5) },
-  composerPlaceholder: { fontSize: rf(1.6), color: '#9CA3AF', flex: 1 },
-  composerPhotoBtn: { padding: 4 },
-  composerPhotoIcon: { fontSize: rf(2.0) },
-  feed: { paddingHorizontal: rw(3.2), paddingTop: rh(1), paddingBottom: rh(11) },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: rw(3.7),
-    marginBottom: rh(1.2),
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: rh(1.2) },
-  avatarImage: { width: rw(11.2), height: rw(11.2), borderRadius: rw(5.6), marginRight: rw(2.7) },
-  avatarCircle: {
-    width: rw(11.2),
-    height: rw(11.2),
-    borderRadius: rw(5.6),
-    backgroundColor: '#EEF2FF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: rw(2.7),
-  },
-  avatarText: { fontSize: rf(1.5), fontWeight: '700', color: '#6366F1' },
-  authorInfo: { flex: 1 },
-  authorName: { fontSize: rf(1.6), fontWeight: '700', color: '#111827' },
-  postTime: { fontSize: rf(1.4), color: '#9CA3AF', marginTop: 1 },
-  deleteBtn: { padding: 4 },
-  deleteBtnText: { fontSize: rf(2.4), color: '#9CA3AF', lineHeight: 22 },
-  postContent: { fontSize: rf(1.6), color: '#374151', lineHeight: 22, marginBottom: rh(1.2) },
-  postImage: { width: '100%', height: rh(24.6), borderRadius: 10, marginBottom: rh(1.2) },
-  cardFooter: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    paddingTop: rh(1.2),
-    gap: rw(4.3),
-  },
-  actionBtn: { flexDirection: 'row', alignItems: 'center' },
-  actionText: { fontSize: rf(1.5), color: '#6B7280', fontWeight: '500' },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: rh(9.9),
-    paddingHorizontal: rw(8.5),
-  },
-  emptyIcon: { fontSize: rf(5.0), marginBottom: rh(2) },
-  emptyTitle: { fontSize: rf(2.0), fontWeight: '700', color: '#111827', marginBottom: rh(1) },
-  emptySubtitle: {
-    fontSize: rf(1.6),
-    color: '#6B7280',
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: rh(3),
-  },
-  emptyButton: {
-    backgroundColor: '#6366F1',
-    paddingVertical: rh(1.5),
-    paddingHorizontal: rw(7.5),
-    borderRadius: 24,
-  },
-  emptyButtonText: { color: '#fff', fontWeight: '700', fontSize: rf(1.7) },
-  fabWrapper: {
-    position: 'absolute',
-    bottom: rh(3),
-    right: rw(5.3),
-  },
+  composerAvatarText: { color: '#fff', fontWeight: '800', fontSize: rf(1.5) },
+  composerHint: { flex: 1, fontSize: rf(1.55) },
+  composerIcons: { flexDirection: 'row', gap: 6 },
+  composerIcon: { fontSize: 20 },
+
+  // Feed label
+  feedLabel: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: rh(1.2) },
+  feedLabelLine: { flex: 1, height: StyleSheet.hairlineWidth },
+  feedLabelText: { fontSize: rf(1.2), fontWeight: '700', textTransform: 'uppercase', letterSpacing: 1 },
+
+  // FAB
+  fabWrap: { position: 'absolute', bottom: rh(3.5), right: rw(5) },
   fab: {
-    width: rw(14.9),
-    height: rw(14.9),
-    borderRadius: rw(7.5),
-    backgroundColor: '#6366F1',
-    alignItems: 'center',
-    justifyContent: 'center',
-    elevation: 6,
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.35,
-    shadowRadius: 6,
+    width: rw(14), height: rw(14), borderRadius: rw(7),
+    alignItems: 'center', justifyContent: 'center',
+    elevation: 10, shadowOffset: { width: 0, height: 5 },
+    shadowOpacity: 0.45, shadowRadius: 12,
   },
-  fabIcon: { color: '#fff', fontSize: rf(3.2), lineHeight: 32, fontWeight: '300' },
+  fabIcon: { color: '#fff', fontSize: rf(3.2), fontWeight: '300', lineHeight: 34 },
 });
 
 export default HomeScreen;

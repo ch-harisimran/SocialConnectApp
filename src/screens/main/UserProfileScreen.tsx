@@ -8,6 +8,7 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { usePosts } from '../../context/PostsContext';
@@ -16,6 +17,7 @@ import { mockAuth } from '../../services/mockAuth';
 import { Post } from '../../services/mockPosts';
 import { formatTimeAgo } from '../../utils/formatTime';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
+import { useTheme } from '../../utils/theme';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'UserProfile'>;
 type Route = RouteProp<HomeStackParamList, 'UserProfile'>;
@@ -27,29 +29,38 @@ interface PublicProfile {
   avatar: string | null;
 }
 
-const PostTile: React.FC<{ post: Post; onPress: () => void }> = memo(({ post, onPress }) => (
-  <TouchableOpacity style={styles.postCard} onPress={onPress} activeOpacity={0.85}>
-    <Text style={styles.postContent} numberOfLines={3}>
-      {post.content}
-    </Text>
-    {post.imageUri ? (
-      <Image source={{ uri: post.imageUri }} style={styles.postImage} resizeMode="cover" />
-    ) : null}
-    <View style={styles.postMeta}>
-      <Text style={styles.postTime}>{formatTimeAgo(post.createdAt)}</Text>
-      <View style={styles.postStats}>
-        <Text style={styles.postStat}>♥ {post.likes.length}</Text>
-        <Text style={styles.postStat}>💬 {post.comments.length}</Text>
+const PostTile: React.FC<{ post: Post; onPress: () => void }> = memo(({ post, onPress }) => {
+  const t = useTheme();
+  return (
+    <TouchableOpacity
+      style={[styles.postCard, { backgroundColor: t.card, borderColor: t.border }]}
+      onPress={onPress}
+      activeOpacity={0.85}
+    >
+      <Text style={[styles.postContent, { color: t.text }]} numberOfLines={3}>
+        {post.content}
+      </Text>
+      {post.imageUri ? (
+        <Image source={{ uri: post.imageUri }} style={styles.postImage} resizeMode="cover" />
+      ) : null}
+      <View style={[styles.postMeta, { borderTopColor: t.border }]}>
+        <Text style={[styles.postTime, { color: t.subtext }]}>{formatTimeAgo(post.createdAt)}</Text>
+        <View style={styles.postStats}>
+          <Text style={[styles.postStat, { color: t.accent }]}>♥ {post.likes.length}</Text>
+          <Text style={[styles.postStat, { color: t.subtext }]}>💬 {post.comments.length}</Text>
+        </View>
       </View>
-    </View>
-  </TouchableOpacity>
-));
+    </TouchableOpacity>
+  );
+});
 PostTile.displayName = 'PostTile';
 
 const UserProfileScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const { userId, userName } = route.params;
+  const insets = useSafeAreaInsets();
+  const t = useTheme();
 
   const { posts } = usePosts();
   const { user: currentUser } = useAuth();
@@ -66,7 +77,6 @@ const UserProfileScreen: React.FC = () => {
       if (data) {
         setProfile(data);
       } else {
-        // Fall back to data embedded in posts if user registered on another device
         const anyPost = posts.find(p => p.authorId === userId);
         if (anyPost) {
           setProfile({
@@ -85,8 +95,8 @@ const UserProfileScreen: React.FC = () => {
 
   if (isLoading) {
     return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#6366F1" />
+      <View style={[styles.loadingContainer, { backgroundColor: t.bg }]}>
+        <ActivityIndicator size="large" color={t.accent} />
       </View>
     );
   }
@@ -100,28 +110,50 @@ const UserProfileScreen: React.FC = () => {
       maxToRenderPerBatch={8}
       initialNumToRender={6}
       windowSize={10}
-      contentContainerStyle={styles.listContent}
+      style={{ backgroundColor: t.bg }}
+      contentContainerStyle={[styles.listContent, { backgroundColor: t.bg }]}
       ListHeaderComponent={
         <>
-          {/* Top bar */}
-          <View style={styles.navbar}>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={styles.navBack}>
-              <Text style={styles.navBackText}>←</Text>
+          {/* Navbar with safe area */}
+          <View
+            style={[
+              styles.navbar,
+              {
+                backgroundColor: t.header,
+                borderBottomColor: t.border,
+                paddingTop: insets.top + 10,
+              },
+            ]}
+          >
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              style={styles.navBack}
+              hitSlop={8}
+            >
+              <Text style={[styles.navBackText, { color: t.accent }]}>←</Text>
             </TouchableOpacity>
-            <Text style={styles.navTitle} numberOfLines={1}>
+            <Text style={[styles.navTitle, { color: t.text }]} numberOfLines={1}>
               {profile?.name ?? userName}
             </Text>
             <View style={styles.navBack} />
           </View>
 
           {/* Cover + avatar */}
-          <View style={styles.coverBand} />
-          <View style={styles.profileSection}>
+          <View style={[styles.coverBand, { backgroundColor: t.accent }]} />
+          <View style={[styles.profileSection, { backgroundColor: t.card }]}>
             <View style={styles.avatarWrapper}>
               {profile?.avatar ? (
-                <Image source={{ uri: profile.avatar }} style={styles.avatarImage} />
+                <Image
+                  source={{ uri: profile.avatar }}
+                  style={[styles.avatarImage, { borderColor: t.card }]}
+                />
               ) : (
-                <View style={styles.avatarCircle}>
+                <View
+                  style={[
+                    styles.avatarCircle,
+                    { backgroundColor: t.accent, borderColor: t.card },
+                  ]}
+                >
                   <Text style={styles.avatarInitials}>{initials}</Text>
                 </View>
               )}
@@ -129,21 +161,31 @@ const UserProfileScreen: React.FC = () => {
 
             <View style={styles.nameRow}>
               <View style={styles.nameBlock}>
-                <Text style={styles.name}>{profile?.name ?? userName}</Text>
+                <Text style={[styles.name, { color: t.text }]}>{profile?.name ?? userName}</Text>
                 {profile?.bio ? (
-                  <Text style={styles.bio}>{profile.bio}</Text>
+                  <Text style={[styles.bio, { color: t.subtext }]}>{profile.bio}</Text>
                 ) : (
-                  <Text style={styles.bioEmpty}>No bio yet.</Text>
+                  <Text style={[styles.bioEmpty, { color: t.placeholder }]}>No bio yet.</Text>
                 )}
               </View>
 
               {!isOwnProfile && (
                 <TouchableOpacity
-                  style={[styles.followBtn, isFollowing && styles.followingBtn]}
+                  style={[
+                    styles.followBtn,
+                    isFollowing
+                      ? { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: t.accent }
+                      : { backgroundColor: t.accent },
+                  ]}
                   onPress={() => setIsFollowing(prev => !prev)}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.followBtnText, isFollowing && styles.followingBtnText]}>
+                  <Text
+                    style={[
+                      styles.followBtnText,
+                      { color: isFollowing ? t.accent : '#fff' },
+                    ]}
+                  >
                     {isFollowing ? 'Following' : 'Follow'}
                   </Text>
                 </TouchableOpacity>
@@ -151,25 +193,25 @@ const UserProfileScreen: React.FC = () => {
             </View>
 
             {/* Stats row */}
-            <View style={styles.statsRow}>
+            <View style={[styles.statsRow, { borderTopColor: t.border }]}>
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{userPosts.length}</Text>
-                <Text style={styles.statLabel}>Posts</Text>
+                <Text style={[styles.statValue, { color: t.text }]}>{userPosts.length}</Text>
+                <Text style={[styles.statLabel, { color: t.subtext }]}>Posts</Text>
               </View>
-              <View style={styles.statDivider} />
+              <View style={[styles.statDivider, { backgroundColor: t.border }]} />
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>{isFollowing ? 1 : 0}</Text>
-                <Text style={styles.statLabel}>Followers</Text>
+                <Text style={[styles.statValue, { color: t.text }]}>{isFollowing ? 1 : 0}</Text>
+                <Text style={[styles.statLabel, { color: t.subtext }]}>Followers</Text>
               </View>
-              <View style={styles.statDivider} />
+              <View style={[styles.statDivider, { backgroundColor: t.border }]} />
               <View style={styles.statItem}>
-                <Text style={styles.statValue}>0</Text>
-                <Text style={styles.statLabel}>Following</Text>
+                <Text style={[styles.statValue, { color: t.text }]}>0</Text>
+                <Text style={[styles.statLabel, { color: t.subtext }]}>Following</Text>
               </View>
             </View>
           </View>
 
-          <Text style={styles.sectionLabel}>
+          <Text style={[styles.sectionLabel, { color: t.subtext }]}>
             {userPosts.length === 0 ? 'No posts yet' : `Posts · ${userPosts.length}`}
           </Text>
         </>
@@ -182,62 +224,52 @@ const UserProfileScreen: React.FC = () => {
       )}
       ListEmptyComponent={
         <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyText, { color: t.placeholder }]}>
             {isOwnProfile ? "You haven't posted anything yet." : "This user hasn't posted yet."}
           </Text>
         </View>
       }
+      ListFooterComponent={<View style={{ height: insets.bottom + 24 }} />}
     />
   );
 };
 
 const styles = StyleSheet.create({
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#fff',
-  },
-  listContent: { paddingBottom: 32, backgroundColor: '#F3F4F6' },
+  loadingContainer: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  listContent: { paddingBottom: 8 },
   navbar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#fff',
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    paddingBottom: 14,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   navBack: { width: 36 },
-  navBackText: { fontSize: 22, color: '#6366F1' },
-  navTitle: { fontSize: 16, fontWeight: '700', color: '#111827', flex: 1, textAlign: 'center' },
-  coverBand: { height: 100, backgroundColor: '#6366F1' },
+  navBackText: { fontSize: 24 },
+  navTitle: { fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
+  coverBand: { height: 100 },
   profileSection: {
-    backgroundColor: '#fff',
     paddingHorizontal: 16,
     paddingBottom: 16,
-    marginBottom: 8,
+    marginBottom: 10,
   },
-  avatarWrapper: { marginTop: -40, marginBottom: 10 },
+  avatarWrapper: { marginTop: -42, marginBottom: 10 },
   avatarImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 3,
-    borderColor: '#fff',
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    borderWidth: 4,
   },
   avatarCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#4F46E5',
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: '#fff',
+    borderWidth: 4,
   },
-  avatarInitials: { fontSize: 26, fontWeight: '800', color: '#fff' },
+  avatarInitials: { fontSize: 28, fontWeight: '800', color: '#fff' },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -246,56 +278,55 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   nameBlock: { flex: 1 },
-  name: { fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 4 },
-  bio: { fontSize: 14, color: '#374151', lineHeight: 20 },
-  bioEmpty: { fontSize: 13, color: '#9CA3AF', fontStyle: 'italic' },
+  name: { fontSize: 19, fontWeight: '800', marginBottom: 4, letterSpacing: -0.3 },
+  bio: { fontSize: 14, lineHeight: 20 },
+  bioEmpty: { fontSize: 13, fontStyle: 'italic' },
   followBtn: {
     paddingVertical: 8,
     paddingHorizontal: 20,
-    borderRadius: 20,
-    backgroundColor: '#6366F1',
+    borderRadius: 22,
     marginTop: 2,
   },
-  followingBtn: { backgroundColor: '#fff', borderWidth: 1.5, borderColor: '#6366F1' },
-  followBtnText: { color: '#fff', fontWeight: '700', fontSize: 13 },
-  followingBtnText: { color: '#6366F1' },
+  followBtnText: { fontWeight: '700', fontSize: 13 },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
+    borderTopWidth: StyleSheet.hairlineWidth,
     paddingTop: 14,
   },
   statItem: { flex: 1, alignItems: 'center' },
-  statValue: { fontSize: 18, fontWeight: '800', color: '#111827' },
-  statLabel: { fontSize: 12, color: '#6B7280', marginTop: 2 },
-  statDivider: { width: 1, height: 32, backgroundColor: '#E5E7EB' },
+  statValue: { fontSize: 20, fontWeight: '800' },
+  statLabel: { fontSize: 12, marginTop: 2 },
+  statDivider: { width: StyleSheet.hairlineWidth, height: 32 },
   sectionLabel: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#6B7280',
     textTransform: 'uppercase',
-    letterSpacing: 0.6,
-    paddingHorizontal: 14,
+    letterSpacing: 1,
+    paddingHorizontal: 16,
     paddingVertical: 10,
   },
   postCard: {
-    backgroundColor: '#fff',
-    marginHorizontal: 12,
+    marginHorizontal: 14,
     marginBottom: 10,
-    borderRadius: 12,
+    borderRadius: 14,
     padding: 14,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  postContent: { fontSize: 14, color: '#374151', lineHeight: 21, marginBottom: 8 },
-  postImage: { width: '100%', height: 160, borderRadius: 8, marginBottom: 8 },
-  postMeta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  postTime: { fontSize: 12, color: '#9CA3AF' },
+  postContent: { fontSize: 14, lineHeight: 21, marginBottom: 8 },
+  postImage: { width: '100%', height: 160, borderRadius: 10, marginBottom: 8 },
+  postMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  postTime: { fontSize: 12 },
   postStats: { flexDirection: 'row', gap: 12 },
-  postStat: { fontSize: 12, color: '#6B7280', fontWeight: '500' },
+  postStat: { fontSize: 12, fontWeight: '500' },
   emptyContainer: { alignItems: 'center', paddingTop: 48 },
-  emptyText: { fontSize: 14, color: '#9CA3AF', fontStyle: 'italic' },
+  emptyText: { fontSize: 14, fontStyle: 'italic' },
 });
 
 export default UserProfileScreen;
