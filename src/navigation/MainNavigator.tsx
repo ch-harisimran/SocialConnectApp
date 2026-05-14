@@ -1,14 +1,17 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View } from 'react-native';
+import { NavigatorScreenParams } from '@react-navigation/native';
 import HomeStackNavigator from './HomeStackNavigator';
 import ProfileStackNavigator from './ProfileStackNavigator';
 import SettingsScreen from '../screens/main/SettingsScreen';
 import { useTheme } from '../utils/theme';
+import type { ProfileStackParamList } from './ProfileStackNavigator';
+import type { HomeStackParamList } from './HomeStackNavigator';
 
 export type MainTabParamList = {
-  Home: undefined;
-  Profile: undefined;
+  Home: NavigatorScreenParams<HomeStackParamList>;
+  Profile: NavigatorScreenParams<ProfileStackParamList>;
   Settings: undefined;
 };
 

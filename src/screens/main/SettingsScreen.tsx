@@ -9,12 +9,17 @@ import {
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useNavigation } from '@react-navigation/native';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../../context/AuthContext';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { setNotificationsEnabled, setDarkMode } from '../../store/slices/settingsSlice';
 import { notificationService } from '../../services/notificationService';
 import { useTheme } from '../../utils/theme';
 import { rf } from '../../utils/responsive';
+import type { MainTabParamList } from '../../navigation/MainNavigator';
+
+type Nav = BottomTabNavigationProp<MainTabParamList, 'Settings'>;
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 interface RowProps {
@@ -77,6 +82,7 @@ const sectionStyles = StyleSheet.create({
 
 // ─── SettingsScreen ───────────────────────────────────────────────────────────
 const SettingsScreen: React.FC = () => {
+  const navigation = useNavigation<Nav>();
   const { user, logout } = useAuth();
   const dispatch = useAppDispatch();
   const insets = useSafeAreaInsets();
@@ -169,7 +175,7 @@ const SettingsScreen: React.FC = () => {
         <SectionCard title="Account" bgColor={t.card} borderColor={t.border} titleColor={t.subtext}>
           <SettingRow {...rowProps} icon="✏️" iconBg="#EEF2FF" label="Edit Profile"
             sublabel="Name, bio and photo"
-            onPress={() => Alert.alert('Coming soon', 'Edit profile is not yet available.')} />
+            onPress={() => navigation.navigate('Profile', { screen: 'EditProfile' })} />
           <SettingRow {...rowProps} icon="🔒" iconBg="#F0FDF4" label="Change Password"
             onPress={() => Alert.alert('Coming soon', 'Change password is not yet available.')} />
           <SettingRow {...rowProps} icon="📧" iconBg="#FFF7ED" label="Email Address"
