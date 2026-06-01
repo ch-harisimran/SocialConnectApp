@@ -21,7 +21,23 @@ export const supabaseSyncService = {
       { onConflict: 'id' }
     );
 
-    if (error) console.warn('Profile sync failed:', error.message);
+    if (error) throw new Error(error.message);
+  },
+
+  async syncAuthorOnPosts(
+    authorId: string,
+    authorName: string,
+    authorAvatar: string | null
+  ): Promise<void> {
+    const supabase = getSupabase();
+    if (!supabase || !isSupabaseConfigured()) return;
+
+    const { error } = await supabase
+      .from('posts')
+      .update({ author_name: authorName, author_avatar: authorAvatar })
+      .eq('author_id', authorId);
+
+    if (error) throw new Error(error.message);
   },
 
   async upsertPost(post: Post): Promise<void> {

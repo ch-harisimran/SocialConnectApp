@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { supabaseSyncService } from './supabaseSyncService';
+import { mockPostsService } from './mockPosts';
 
 const USERS_KEY = '@social_connect_users';
 const SESSION_KEY = '@social_connect_session';
@@ -108,6 +109,7 @@ export const mockAuth = {
     };
     await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
     await supabaseSyncService.upsertProfile(session);
+    await mockPostsService.updateAuthorInfo(userId, session.name, session.avatar);
     return session;
   },
 

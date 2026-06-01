@@ -150,4 +150,26 @@ export const mockPostsService = {
     await supabaseSyncService.upsertPost(posts[index]);
     return posts[index];
   },
+
+  async updateAuthorInfo(
+    authorId: string,
+    authorName: string,
+    authorAvatar: string | null
+  ): Promise<void> {
+    const posts = await getPosts();
+    const updatedPosts = posts.map(post =>
+      post.authorId === authorId
+        ? { ...post, authorName, authorAvatar: authorAvatar }
+        : post
+    );
+
+    const hasChanges = updatedPosts.some((post, i) => post !== posts[i]);
+    if (!hasChanges) return;
+
+    await savePosts(updatedPosts);
+
+    const authorPosts = updatedPosts.filter(p => p.authorId === authorId);
+    await Promise.all(authorPosts.map(p => supabaseSyncService.upsertPost(p)));
+    await supabaseSyncService.syncAuthorOnPosts(authorId, authorName, authorAvatar);
+  },
 };

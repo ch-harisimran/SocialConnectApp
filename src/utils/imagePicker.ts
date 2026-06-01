@@ -71,4 +71,16 @@ export const imagePicker = {
       { text: 'Cancel', style: 'cancel' },
     ]);
   },
+
+  showProfilePickerOptions(onSelected: (uri: string | null) => void): void {
+    Alert.alert('Profile Picture', 'Choose a source', [
+      { text: 'Take Photo', onPress: () => imagePicker.takePhoto().then(uri => uri && onSelected(uri)) },
+      {
+        text: 'Choose from Library',
+        onPress: () => imagePicker.pickFromLibrary().then(uri => uri && onSelected(uri)),
+      },
+      { text: 'Remove Photo', style: 'destructive', onPress: () => onSelected(null) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  },
 };

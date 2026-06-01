@@ -9,17 +9,17 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
-  Alert,
   TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import FormInput from '../../components/auth/FormInput';
 import { useAuth } from '../../context/AuthContext';
+import { imageUploadService } from '../../services/imageUploadService';
+import { imagePicker } from '../../utils/imagePicker';
 import { ProfileStackParamList } from '../../navigation/ProfileStackNavigator';
 import { useTheme } from '../../utils/theme';
 import { rf } from '../../utils/responsive';
@@ -44,55 +44,27 @@ const EditProfileScreen: React.FC = () => {
   const [avatar, setAvatar] = useState<string | null>(user?.avatar ?? null);
   const [serverError, setServerError] = useState('');
 
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow access to your photo library.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: 'images',
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets.length > 0) {
-      setAvatar(result.assets[0].uri);
-    }
-  };
-
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow camera access.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets.length > 0) {
-      setAvatar(result.assets[0].uri);
-    }
-  };
-
   const showImageOptions = () => {
-    Alert.alert('Profile Picture', 'Choose a source', [
-      { text: 'Camera', onPress: takePhoto },
-      { text: 'Photo Library', onPress: pickImage },
-      { text: 'Remove Photo', style: 'destructive', onPress: () => setAvatar(null) },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+    imagePicker.showProfilePickerOptions(uri => setAvatar(uri));
   };
 
   const formik = useFormik({
     initialValues: { name: user?.name ?? '', bio: user?.bio ?? '' },
     validationSchema,
     onSubmit: async values => {
+      if (!user) return;
       setServerError('');
       try {
-        await updateProfile({ name: values.name.trim(), bio: values.bio.trim(), avatar });
+        let avatarUrl = avatar;
+        if (avatar && !avatar.startsWith('http')) {
+          avatarUrl = await imageUploadService.uploadProfileImage(avatar, user.id);
+        }
+
+        await updateProfile({
+          name: values.name.trim(),
+          bio: values.bio.trim(),
+          avatar: avatarUrl,
+        });
         navigation.goBack();
       } catch (err: unknown) {
         setServerError(err instanceof Error ? err.message : 'Failed to save. Please try again.');
@@ -158,7 +130,7 @@ const EditProfileScreen: React.FC = () => {
           </TouchableOpacity>
           <Text style={[styles.changePhotoText, { color: t.accent }]}>Change Profile Photo</Text>
           <Text style={[styles.changePhotoHint, { color: t.subtext }]}>
-            Tap the photo to choose from library or take a new one
+            Preview your photo here before saving
           </Text>
         </View>
 
@@ -271,6 +243,8 @@ const styles = StyleSheet.create({
   navTitle: { fontSize: rf(1.9), fontWeight: '800' },
   navCancel: { fontSize: rf(1.7) },
   navSave: { fontSize: rf(1.7), fontWeight: '800', textAlign: 'right' },
+
+  scroll: { flexGrow: 1 },
 
   // Avatar
   avatarSection: {

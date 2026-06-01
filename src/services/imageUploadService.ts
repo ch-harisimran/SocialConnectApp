@@ -1,8 +1,10 @@
 import { getSupabase, isSupabaseConfigured } from '../config/supabase';
 
-const BUCKET = 'post-images';
+const POST_IMAGES_BUCKET = 'post-images';
+const PROFILE_IMAGES_BUCKET = 'profile-images';
 
-const isRemoteUrl = (uri: string): boolean => uri.startsWith('http://') || uri.startsWith('https://');
+const isRemoteUrl = (uri: string): boolean =>
+  uri.startsWith('http://') || uri.startsWith('https://');
 
 const getExtension = (uri: string): string => {
   const match = uri.match(/\.(\w+)(?:\?|$)/);
@@ -16,32 +18,49 @@ const getContentType = (ext: string): string => {
   return 'image/jpeg';
 };
 
+const uploadToBucket = async (
+  bucket: string,
+  localUri: string,
+  filePath: string
+): Promise<string> => {
+  const supabase = getSupabase();
+  if (!supabase || !isSupabaseConfigured()) {
+    return localUri;
+  }
+
+  const ext = getExtension(localUri);
+  const contentType = getContentType(ext);
+
+  const response = await fetch(localUri);
+  const blob = await response.blob();
+
+  const { error } = await supabase.storage.from(bucket).upload(filePath, blob, {
+    contentType,
+    upsert: true,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+  return `${data.publicUrl}?t=${Date.now()}`;
+};
+
 export const imageUploadService = {
   async uploadPostImage(localUri: string, userId: string): Promise<string> {
     if (isRemoteUrl(localUri)) return localUri;
 
-    const supabase = getSupabase();
-    if (!supabase || !isSupabaseConfigured()) {
-      return localUri;
-    }
-
     const ext = getExtension(localUri);
     const filePath = `${userId}/${Date.now()}.${ext}`;
-    const contentType = getContentType(ext);
+    return uploadToBucket(POST_IMAGES_BUCKET, localUri, filePath);
+  },
 
-    const response = await fetch(localUri);
-    const blob = await response.blob();
+  async uploadProfileImage(localUri: string, userId: string): Promise<string> {
+    if (isRemoteUrl(localUri)) return localUri;
 
-    const { error } = await supabase.storage.from(BUCKET).upload(filePath, blob, {
-      contentType,
-      upsert: false,
-    });
-
-    if (error) {
-      throw new Error(error.message);
-    }
-
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(filePath);
-    return data.publicUrl;
+    const ext = getExtension(localUri);
+    const filePath = `${userId}/avatar.${ext}`;
+    return uploadToBucket(PROFILE_IMAGES_BUCKET, localUri, filePath);
   },
 };
