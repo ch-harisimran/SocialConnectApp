@@ -8,6 +8,7 @@ import {
   logout as logoutThunk,
   updateProfile as updateProfileThunk,
 } from '../store/slices/authSlice';
+import { clearFollowsState, loadFollowingIds } from '../store/slices/followsSlice';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -28,6 +29,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     dispatch(loadSession());
   }, [dispatch]);
+
+  useEffect(() => {
+    if (user) {
+      dispatch(loadFollowingIds());
+    } else {
+      dispatch(clearFollowsState());
+    }
+  }, [dispatch, user]);
 
   const signUp = async (name: string, email: string, password: string) => {
     const result = await dispatch(signUpThunk({ name, email, password }));

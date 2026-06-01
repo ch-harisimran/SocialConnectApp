@@ -13,6 +13,12 @@ import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { usePosts } from '../../context/PostsContext';
 import { useAuth } from '../../context/AuthContext';
+import { useAppDispatch, useAppSelector } from '../../store/hooks';
+import {
+  followUser,
+  unfollowUser,
+  loadProfileFollowState,
+} from '../../store/slices/followsSlice';
 import { mockAuth } from '../../services/mockAuth';
 import { Post } from '../../services/mockPosts';
 import { formatTimeAgo } from '../../utils/formatTime';
@@ -62,18 +68,34 @@ const UserProfileScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const t = useTheme();
 
+  const dispatch = useAppDispatch();
   const { posts } = usePosts();
   const { user: currentUser } = useAuth();
 
+  const profileFollowState = useAppSelector(state => state.follows.profileStates[userId]);
+  const isActionLoading = useAppSelector(state => state.follows.isActionLoading);
+
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isFollowing, setIsFollowing] = useState(false);
 
   const isOwnProfile = currentUser?.id === userId;
+  const isFollowing = profileFollowState?.isFollowing ?? false;
+  const followerCount = profileFollowState?.followers ?? 0;
+  const followingCount = profileFollowState?.following ?? 0;
   const userPosts = useMemo(() => posts.filter(p => p.authorId === userId), [posts, userId]);
 
   useEffect(() => {
-    mockAuth.getPublicProfile(userId).then(data => {
+    let cancelled = false;
+
+    const loadProfile = async () => {
+      setIsLoading(true);
+      const [data] = await Promise.all([
+        mockAuth.getPublicProfile(userId),
+        dispatch(loadProfileFollowState(userId)),
+      ]);
+
+      if (cancelled) return;
+
       if (data) {
         setProfile(data);
       } else {
@@ -88,8 +110,22 @@ const UserProfileScreen: React.FC = () => {
         }
       }
       setIsLoading(false);
-    });
-  }, [userId, posts]);
+    };
+
+    loadProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, posts, dispatch]);
+
+  const handleFollowToggle = async () => {
+    if (isActionLoading) return;
+    if (isFollowing) {
+      await dispatch(unfollowUser(userId));
+    } else {
+      await dispatch(followUser(userId));
+    }
+  };
 
   const initials = (profile?.name ?? userName).slice(0, 2).toUpperCase();
 
@@ -176,18 +212,24 @@ const UserProfileScreen: React.FC = () => {
                     isFollowing
                       ? { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: t.accent }
                       : { backgroundColor: t.accent },
+                    isActionLoading && styles.followBtnDisabled,
                   ]}
-                  onPress={() => setIsFollowing(prev => !prev)}
+                  onPress={handleFollowToggle}
                   activeOpacity={0.8}
+                  disabled={isActionLoading}
                 >
-                  <Text
-                    style={[
-                      styles.followBtnText,
-                      { color: isFollowing ? t.accent : '#fff' },
-                    ]}
-                  >
-                    {isFollowing ? 'Following' : 'Follow'}
-                  </Text>
+                  {isActionLoading ? (
+                    <ActivityIndicator size="small" color={isFollowing ? t.accent : '#fff'} />
+                  ) : (
+                    <Text
+                      style={[
+                        styles.followBtnText,
+                        { color: isFollowing ? t.accent : '#fff' },
+                      ]}
+                    >
+                      {isFollowing ? 'Unfollow' : 'Follow'}
+                    </Text>
+                  )}
                 </TouchableOpacity>
               )}
             </View>
@@ -200,12 +242,12 @@ const UserProfileScreen: React.FC = () => {
               </View>
               <View style={[styles.statDivider, { backgroundColor: t.border }]} />
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: t.text }]}>{isFollowing ? 1 : 0}</Text>
+                <Text style={[styles.statValue, { color: t.text }]}>{followerCount}</Text>
                 <Text style={[styles.statLabel, { color: t.subtext }]}>Followers</Text>
               </View>
               <View style={[styles.statDivider, { backgroundColor: t.border }]} />
               <View style={styles.statItem}>
-                <Text style={[styles.statValue, { color: t.text }]}>0</Text>
+                <Text style={[styles.statValue, { color: t.text }]}>{followingCount}</Text>
                 <Text style={[styles.statLabel, { color: t.subtext }]}>Following</Text>
               </View>
             </View>
@@ -286,7 +328,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 22,
     marginTop: 2,
+    minWidth: 96,
+    alignItems: 'center',
   },
+  followBtnDisabled: { opacity: 0.7 },
   followBtnText: { fontWeight: '700', fontSize: 13 },
   statsRow: {
     flexDirection: 'row',

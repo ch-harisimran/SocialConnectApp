@@ -1,4 +1,4 @@
-import React, { memo, useCallback, useEffect, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -281,23 +281,32 @@ const cardStyles = StyleSheet.create({
 });
 
 // ─── EmptyFeed ────────────────────────────────────────────────────────────────
-const EmptyFeed: React.FC<{ onCreatePost: () => void }> = ({ onCreatePost }) => {
+const EmptyFeed: React.FC<{ onCreatePost: () => void; hasFollows: boolean }> = ({
+  onCreatePost,
+  hasFollows,
+}) => {
   const t = useTheme();
   return (
     <View style={emptyStyles.wrap}>
       <View style={[emptyStyles.iconRing, { borderColor: t.border }]}>
-        <Text style={emptyStyles.icon}>✍️</Text>
+        <Text style={emptyStyles.icon}>{hasFollows ? '✍️' : '👥'}</Text>
       </View>
-      <Text style={[emptyStyles.title, { color: t.text }]}>Nothing here yet</Text>
+      <Text style={[emptyStyles.title, { color: t.text }]}>
+        {hasFollows ? 'Nothing here yet' : 'Your feed is empty'}
+      </Text>
       <Text style={[emptyStyles.sub, { color: t.subtext }]}>
-        Be the first to share something with the community.
+        {hasFollows
+          ? 'Be the first to share something with the community.'
+          : 'Follow other users to see their posts in your feed, or share your own.'}
       </Text>
       <TouchableOpacity
         style={[emptyStyles.btn, { backgroundColor: t.accent }]}
         onPress={onCreatePost}
         activeOpacity={0.85}
       >
-        <Text style={emptyStyles.btnText}>✦  Write your first post</Text>
+        <Text style={emptyStyles.btnText}>
+          {hasFollows ? '✦  Write your first post' : '✦  Create a post'}
+        </Text>
       </TouchableOpacity>
     </View>
   );
@@ -329,6 +338,15 @@ const HomeScreen: React.FC = () => {
   const lastSyncedAt = useAppSelector(s => s.posts.lastSyncedAt);
   const hasNewActivity = useAppSelector(s => s.posts.hasNewActivity);
   const postsError = useAppSelector(s => s.posts.error);
+  const followingIds = useAppSelector(s => s.follows.followingIds);
+
+  const feedPosts = useMemo(() => {
+    if (!user) return posts;
+    const allowedAuthors = new Set([user.id, ...followingIds]);
+    return posts.filter(p => allowedAuthors.has(p.authorId));
+  }, [posts, followingIds, user]);
+
+  const hasFollows = followingIds.length > 0;
 
   const listRef = useRef<FlatList>(null);
   const fabScale = useRef(new Animated.Value(1)).current;
@@ -376,7 +394,7 @@ const HomeScreen: React.FC = () => {
     );
   }
 
-  if (postsError && posts.length === 0) {
+  if (postsError && feedPosts.length === 0) {
     return (
       <View style={[styles.center, { backgroundColor: t.bg }]}>
         <Text style={styles.errorIcon}>⚠️</Text>
@@ -426,7 +444,7 @@ const HomeScreen: React.FC = () => {
 
       <FlatList
         ref={listRef}
-        data={posts}
+        data={feedPosts}
         keyExtractor={item => item.id}
         showsVerticalScrollIndicator={false}
         removeClippedSubviews
@@ -468,7 +486,7 @@ const HomeScreen: React.FC = () => {
               </View>
             </TouchableOpacity>
 
-            {posts.length > 0 && (
+            {feedPosts.length > 0 && (
               <View style={styles.feedLabel}>
                 <View style={[styles.feedLabelLine, { backgroundColor: t.border }]} />
                 <Text style={[styles.feedLabelText, { color: t.subtext }]}>Recent Posts</Text>
@@ -477,7 +495,7 @@ const HomeScreen: React.FC = () => {
             )}
           </>
         }
-        ListEmptyComponent={<EmptyFeed onCreatePost={handleCreatePost} />}
+        ListEmptyComponent={<EmptyFeed onCreatePost={handleCreatePost} hasFollows={hasFollows} />}
         renderItem={({ item, index }) => (
           <PostCard
             post={item} index={index} currentUserId={user?.id ?? ''}
