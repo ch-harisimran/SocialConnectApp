@@ -3,14 +3,17 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Text, View } from 'react-native';
 import { NavigatorScreenParams } from '@react-navigation/native';
 import HomeStackNavigator from './HomeStackNavigator';
+import MessagesStackNavigator from './MessagesStackNavigator';
 import ProfileStackNavigator from './ProfileStackNavigator';
 import SettingsScreen from '../screens/main/SettingsScreen';
 import { useTheme } from '../utils/theme';
 import type { ProfileStackParamList } from './ProfileStackNavigator';
 import type { HomeStackParamList } from './HomeStackNavigator';
+import type { MessagesStackParamList } from './MessagesStackNavigator';
 
 export type MainTabParamList = {
   Home: NavigatorScreenParams<HomeStackParamList>;
+  Messages: NavigatorScreenParams<MessagesStackParamList>;
   Profile: NavigatorScreenParams<ProfileStackParamList>;
   Settings: undefined;
 };
@@ -19,6 +22,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const TAB_ICONS: Record<string, string> = {
   Home: '🏠',
+  Messages: '💬',
   Profile: '👤',
   Settings: '⚙️',
 };
@@ -75,6 +79,7 @@ const MainNavigator: React.FC = () => {
       })}
     >
       <Tab.Screen name="Home" component={HomeStackNavigator} />
+      <Tab.Screen name="Messages" component={MessagesStackNavigator} />
       <Tab.Screen name="Profile" component={ProfileStackNavigator} />
       <Tab.Screen name="Settings" component={SettingsScreen} />
     </Tab.Navigator>

@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { usePosts } from '../../context/PostsContext';
 import { useAuth } from '../../context/AuthContext';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -19,10 +20,12 @@ import {
   unfollowUser,
   loadProfileFollowState,
 } from '../../store/slices/followsSlice';
+import { startConversation } from '../../store/slices/messagesSlice';
 import { mockAuth } from '../../services/mockAuth';
 import { Post } from '../../services/mockPosts';
 import { formatTimeAgo } from '../../utils/formatTime';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
+import { MainTabParamList } from '../../navigation/MainNavigator';
 import { useTheme } from '../../utils/theme';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'UserProfile'>;
@@ -77,6 +80,7 @@ const UserProfileScreen: React.FC = () => {
 
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isStartingChat, setIsStartingChat] = useState(false);
 
   const isOwnProfile = currentUser?.id === userId;
   const isFollowing = profileFollowState?.isFollowing ?? false;
@@ -124,6 +128,30 @@ const UserProfileScreen: React.FC = () => {
       await dispatch(unfollowUser(userId));
     } else {
       await dispatch(followUser(userId));
+    }
+  };
+
+  const handleMessage = async () => {
+    if (isStartingChat) return;
+    setIsStartingChat(true);
+    try {
+      const displayName = profile?.name ?? userName;
+      const result = await dispatch(
+        startConversation({ otherUserId: userId, otherUserName: displayName })
+      );
+      if (startConversation.fulfilled.match(result)) {
+        const tabNav = navigation.getParent<BottomTabNavigationProp<MainTabParamList>>();
+        tabNav?.navigate('Messages', {
+          screen: 'Chat',
+          params: {
+            conversationId: result.payload.id,
+            otherUserId: userId,
+            otherUserName: displayName,
+          },
+        });
+      }
+    } finally {
+      setIsStartingChat(false);
     }
   };
 
@@ -206,31 +234,50 @@ const UserProfileScreen: React.FC = () => {
               </View>
 
               {!isOwnProfile && (
-                <TouchableOpacity
-                  style={[
-                    styles.followBtn,
-                    isFollowing
-                      ? { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: t.accent }
-                      : { backgroundColor: t.accent },
-                    isActionLoading && styles.followBtnDisabled,
-                  ]}
-                  onPress={handleFollowToggle}
-                  activeOpacity={0.8}
-                  disabled={isActionLoading}
-                >
-                  {isActionLoading ? (
-                    <ActivityIndicator size="small" color={isFollowing ? t.accent : '#fff'} />
-                  ) : (
-                    <Text
-                      style={[
-                        styles.followBtnText,
-                        { color: isFollowing ? t.accent : '#fff' },
-                      ]}
-                    >
-                      {isFollowing ? 'Unfollow' : 'Follow'}
-                    </Text>
-                  )}
-                </TouchableOpacity>
+                <View style={styles.actionRow}>
+                  <TouchableOpacity
+                    style={[
+                      styles.followBtn,
+                      isFollowing
+                        ? { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: t.accent }
+                        : { backgroundColor: t.accent },
+                      isActionLoading && styles.followBtnDisabled,
+                    ]}
+                    onPress={handleFollowToggle}
+                    activeOpacity={0.8}
+                    disabled={isActionLoading}
+                  >
+                    {isActionLoading ? (
+                      <ActivityIndicator size="small" color={isFollowing ? t.accent : '#fff'} />
+                    ) : (
+                      <Text
+                        style={[
+                          styles.followBtnText,
+                          { color: isFollowing ? t.accent : '#fff' },
+                        ]}
+                      >
+                        {isFollowing ? 'Unfollow' : 'Follow'}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.messageBtn,
+                      { backgroundColor: t.inputBg, borderColor: t.border },
+                      isStartingChat && styles.followBtnDisabled,
+                    ]}
+                    onPress={handleMessage}
+                    activeOpacity={0.8}
+                    disabled={isStartingChat}
+                  >
+                    {isStartingChat ? (
+                      <ActivityIndicator size="small" color={t.accent} />
+                    ) : (
+                      <Text style={[styles.messageBtnText, { color: t.text }]}>Message</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
               )}
             </View>
 
@@ -323,6 +370,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 19, fontWeight: '800', marginBottom: 4, letterSpacing: -0.3 },
   bio: { fontSize: 14, lineHeight: 20 },
   bioEmpty: { fontSize: 13, fontStyle: 'italic' },
+  actionRow: { flexDirection: 'column', gap: 8, alignItems: 'flex-end' },
   followBtn: {
     paddingVertical: 8,
     paddingHorizontal: 20,
@@ -331,6 +379,15 @@ const styles = StyleSheet.create({
     minWidth: 96,
     alignItems: 'center',
   },
+  messageBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    borderRadius: 22,
+    minWidth: 96,
+    alignItems: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  messageBtnText: { fontWeight: '700', fontSize: 13 },
   followBtnDisabled: { opacity: 0.7 },
   followBtnText: { fontWeight: '700', fontSize: 13 },
   statsRow: {

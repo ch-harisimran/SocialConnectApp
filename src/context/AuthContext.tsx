@@ -9,6 +9,7 @@ import {
   updateProfile as updateProfileThunk,
 } from '../store/slices/authSlice';
 import { clearFollowsState, loadFollowingIds } from '../store/slices/followsSlice';
+import { clearMessagesState, loadConversations } from '../store/slices/messagesSlice';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -33,8 +34,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     if (user) {
       dispatch(loadFollowingIds());
+      dispatch(loadConversations());
     } else {
       dispatch(clearFollowsState());
+      dispatch(clearMessagesState());
     }
   }, [dispatch, user]);
 
