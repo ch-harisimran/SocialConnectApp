@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState, memo } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   TextInput,
   FlatList,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -20,6 +19,8 @@ import {
 import { formatTimeAgo } from '../../utils/formatTime';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import { useTheme } from '../../utils/theme';
+import OptimizedImage from '../../components/OptimizedImage';
+import { FLAT_LIST_PERF_PROPS } from '../../utils/listPerformance';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'Search'>;
 type Filter = 'all' | 'users' | 'posts';
@@ -32,7 +33,7 @@ type ListItem =
 const UserRow: React.FC<{
   user: SearchUserResult;
   onPress: () => void;
-}> = ({ user, onPress }) => {
+}> = memo(({ user, onPress }) => {
   const t = useTheme();
   const initials = user.name.slice(0, 2).toUpperCase();
 
@@ -43,7 +44,7 @@ const UserRow: React.FC<{
       activeOpacity={0.75}
     >
       {user.avatar ? (
-        <Image source={{ uri: user.avatar }} style={styles.avatar} />
+        <OptimizedImage uri={user.avatar} style={styles.avatar} priority="low" />
       ) : (
         <View style={[styles.avatar, styles.avatarFallback, { backgroundColor: t.accent }]}>
           <Text style={styles.avatarText}>{initials}</Text>
@@ -58,12 +59,13 @@ const UserRow: React.FC<{
       <Text style={[styles.rowChevron, { color: t.placeholder }]}>›</Text>
     </TouchableOpacity>
   );
-};
+});
+UserRow.displayName = 'UserRow';
 
 const PostRow: React.FC<{
   post: SearchPostResult;
   onPress: () => void;
-}> = ({ post, onPress }) => {
+}> = memo(({ post, onPress }) => {
   const t = useTheme();
 
   return (
@@ -87,11 +89,12 @@ const PostRow: React.FC<{
         </Text>
       </View>
       {post.imageUri ? (
-        <Image source={{ uri: post.imageUri }} style={styles.postThumb} />
+        <OptimizedImage uri={post.imageUri} style={styles.postThumb} priority="low" />
       ) : null}
     </TouchableOpacity>
   );
-};
+});
+PostRow.displayName = 'PostRow';
 
 const SearchScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
@@ -266,6 +269,7 @@ const SearchScreen: React.FC = () => {
           data={listData}
           keyExtractor={item => item.key}
           renderItem={renderItem}
+          {...FLAT_LIST_PERF_PROPS}
           contentContainerStyle={[
             styles.list,
             listData.length === 0 && styles.listEmpty,

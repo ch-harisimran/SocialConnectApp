@@ -5,7 +5,6 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  Image,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
@@ -21,6 +20,7 @@ import { imageUploadService } from '../../services/imageUploadService';
 import { imagePicker } from '../../utils/imagePicker';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import { useTheme } from '../../utils/theme';
+import OptimizedImage from '../../components/OptimizedImage';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'CreatePost'>;
 type Route = RouteProp<HomeStackParamList, 'CreatePost'>;
@@ -162,7 +162,7 @@ const CreatePostScreen: React.FC = () => {
       >
         <View style={styles.composer}>
           {user?.avatar ? (
-            <Image source={{ uri: user.avatar }} style={styles.avatar} />
+            <OptimizedImage uri={user.avatar} style={styles.avatar} priority="high" />
           ) : (
             <View style={[styles.avatarPlaceholder, { backgroundColor: t.accent }]}>
               <Text style={styles.avatarInitials}>{initials}</Text>
@@ -189,7 +189,7 @@ const CreatePostScreen: React.FC = () => {
 
           {imageUri ? (
             <View style={[styles.imagePreviewWrapper, { borderColor: t.border }]}>
-              <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="cover" />
+              <OptimizedImage uri={imageUri} style={styles.imagePreview} priority="high" />
               <View style={styles.previewBadge}>
                 <Text style={styles.previewBadgeText}>Preview</Text>
               </View>

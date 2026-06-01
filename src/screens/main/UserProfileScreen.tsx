@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Image,
   ActivityIndicator,
   Alert,
 } from 'react-native';
@@ -26,6 +25,8 @@ import { Post } from '../../services/mockPosts';
 import { formatTimeAgo } from '../../utils/formatTime';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import { useTheme } from '../../utils/theme';
+import OptimizedImage from '../../components/OptimizedImage';
+import { FLAT_LIST_PERF_PROPS } from '../../utils/listPerformance';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'UserProfile'>;
 type Route = RouteProp<HomeStackParamList, 'UserProfile'>;
@@ -59,7 +60,12 @@ const PostTile: React.FC<{
           {post.content}
         </Text>
         {post.imageUri ? (
-          <Image source={{ uri: post.imageUri }} style={styles.postImage} resizeMode="cover" />
+          <OptimizedImage
+            uri={post.imageUri}
+            style={styles.postImage}
+            priority="low"
+            recyclingKey={`profile-post-${post.id}`}
+          />
         ) : null}
         <View style={[styles.postMeta, { borderTopColor: t.border }]}>
           <Text style={[styles.postTime, { color: t.subtext }]}>{formatTimeAgo(post.createdAt)}</Text>
@@ -195,10 +201,7 @@ const UserProfileScreen: React.FC = () => {
       data={userPosts}
       keyExtractor={item => item.id}
       showsVerticalScrollIndicator={false}
-      removeClippedSubviews
-      maxToRenderPerBatch={8}
-      initialNumToRender={6}
-      windowSize={10}
+      {...FLAT_LIST_PERF_PROPS}
       style={{ backgroundColor: t.bg }}
       contentContainerStyle={[styles.listContent, { backgroundColor: t.bg }]}
       ListHeaderComponent={
@@ -232,9 +235,11 @@ const UserProfileScreen: React.FC = () => {
           <View style={[styles.profileSection, { backgroundColor: t.card }]}>
             <View style={styles.avatarWrapper}>
               {profile?.avatar ? (
-                <Image
-                  source={{ uri: profile.avatar }}
+                <OptimizedImage
+                  uri={profile.avatar}
                   style={[styles.avatarImage, { borderColor: t.card }]}
+                  priority="high"
+                  recyclingKey={`profile-avatar-${userId}`}
                 />
               ) : (
                 <View

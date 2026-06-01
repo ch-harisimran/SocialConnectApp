@@ -1,4 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { InteractionManager } from 'react-native';
 import { mockPostsService, Post } from '../../services/mockPosts';
 import { notificationService } from '../../services/notificationService';
 import { supabaseSyncService } from '../../services/supabaseSyncService';
@@ -23,16 +24,24 @@ const initialState: PostsState = {
   error: null,
 };
 
+const deferSupabaseSync = (posts: Post[]): void => {
+  InteractionManager.runAfterInteractions(() => {
+    supabaseSyncService.syncAllPosts(posts);
+    supabaseSyncService.syncAllProfiles();
+  });
+};
+
 export const fetchPosts = createAsyncThunk('posts/fetchPosts', async () => {
   const posts = await mockPostsService.fetchPosts();
-  supabaseSyncService.syncAllPosts(posts);
-  supabaseSyncService.syncAllProfiles();
+  deferSupabaseSync(posts);
   return posts;
 });
 
 export const refreshPosts = createAsyncThunk('posts/refreshPosts', async () => {
   const posts = await mockPostsService.fetchPosts();
-  supabaseSyncService.syncAllPosts(posts);
+  InteractionManager.runAfterInteractions(() => {
+    supabaseSyncService.syncAllPosts(posts);
+  });
   return posts;
 });
 

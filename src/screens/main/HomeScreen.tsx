@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Image,
   RefreshControl,
   ActivityIndicator,
   Alert,
@@ -25,6 +24,8 @@ import { useTheme } from '../../utils/theme';
 import { Post } from '../../services/mockPosts';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import AnimatedHeartButton from '../../components/AnimatedHeartButton';
+import OptimizedImage from '../../components/OptimizedImage';
+import { FLAT_LIST_PERF_PROPS } from '../../utils/listPerformance';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'Home'>;
 
@@ -190,7 +191,12 @@ const PostCard = memo<PostCardProps>(
           >
             <View style={[cardStyles.avatarRing, { borderColor: authorColor }]}>
               {post.authorAvatar ? (
-                <Image source={{ uri: post.authorAvatar }} style={cardStyles.avatarImg} />
+                <OptimizedImage
+                  uri={post.authorAvatar}
+                  style={cardStyles.avatarImg}
+                  priority="normal"
+                  recyclingKey={`avatar-${post.authorId}`}
+                />
               ) : (
                 <View style={[cardStyles.avatarCircle, { backgroundColor: authorColor }]}>
                   <Text style={cardStyles.avatarText}>{initials}</Text>
@@ -227,7 +233,13 @@ const PostCard = memo<PostCardProps>(
         <Text style={[cardStyles.content, { color: t.text }]}>{post.content}</Text>
 
         {post.imageUri ? (
-          <Image source={{ uri: post.imageUri }} style={cardStyles.image} resizeMode="cover" />
+          <OptimizedImage
+            uri={post.imageUri}
+            style={cardStyles.image}
+            contentFit="cover"
+            priority="low"
+            recyclingKey={`post-${post.id}`}
+          />
         ) : null}
 
         {/* Actions */}
@@ -413,6 +425,65 @@ const HomeScreen: React.FC = () => {
   const initials = user?.name?.slice(0, 2).toUpperCase() ?? 'U';
   const fabSpin = fabRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] });
 
+  const renderPost = useCallback(
+    ({ item, index }: { item: Post; index: number }) => (
+      <PostCard
+        post={item}
+        index={index}
+        currentUserId={user?.id ?? ''}
+        onLike={handleLike}
+        onComment={handleComment}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        onViewProfile={handleViewProfile}
+      />
+    ),
+    [user?.id, handleLike, handleComment, handleEdit, handleDelete, handleViewProfile]
+  );
+
+  const listHeader = useMemo(
+    () => (
+      <>
+        <View style={[styles.storiesCard, { backgroundColor: t.card, borderColor: t.border }]}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesRow}>
+            {STORIES.map(s => (
+              <StoryBubble key={s.id} item={s} theme={t} />
+            ))}
+          </ScrollView>
+        </View>
+
+        <TouchableOpacity
+          style={[styles.composer, { backgroundColor: t.card, borderColor: t.border }]}
+          onPress={handleCreatePost}
+          activeOpacity={0.7}
+        >
+          {user?.avatar ? (
+            <OptimizedImage uri={user.avatar} style={[styles.composerAvatar, { borderColor: t.border }]} />
+          ) : (
+            <View style={[styles.composerAvatarCircle, { backgroundColor: t.accent }]}>
+              <Text style={styles.composerAvatarText}>{initials}</Text>
+            </View>
+          )}
+          <Text style={[styles.composerHint, { color: t.placeholder }]}>
+            What's on your mind, {user?.name?.split(' ')[0] ?? 'there'}?
+          </Text>
+          <View style={styles.composerIcons}>
+            <Text style={styles.composerIcon}>🖼</Text>
+          </View>
+        </TouchableOpacity>
+
+        {feedPosts.length > 0 && (
+          <View style={styles.feedLabel}>
+            <View style={[styles.feedLabelLine, { backgroundColor: t.border }]} />
+            <Text style={[styles.feedLabelText, { color: t.subtext }]}>Recent Posts</Text>
+            <View style={[styles.feedLabelLine, { backgroundColor: t.border }]} />
+          </View>
+        )}
+      </>
+    ),
+    [t, user, initials, feedPosts.length, handleCreatePost]
+  );
+
   if (isLoading) {
     return (
       <View style={[styles.center, { backgroundColor: t.bg }]}>
@@ -474,7 +545,7 @@ const HomeScreen: React.FC = () => {
             activeOpacity={0.8}
           >
             {user?.avatar ? (
-              <Image source={{ uri: user.avatar }} style={[styles.headerAvatar, { borderColor: t.accent }]} />
+              <OptimizedImage uri={user.avatar} style={[styles.headerAvatar, { borderColor: t.accent }]} priority="high" />
             ) : (
               <View style={[styles.headerAvatarCircle, { backgroundColor: t.accent }]}>
                 <Text style={styles.headerAvatarText}>{initials}</Text>
@@ -489,62 +560,15 @@ const HomeScreen: React.FC = () => {
         data={feedPosts}
         keyExtractor={item => item.id}
         showsVerticalScrollIndicator={false}
-        removeClippedSubviews
-        maxToRenderPerBatch={5}
-        initialNumToRender={6}
-        windowSize={10}
+        {...FLAT_LIST_PERF_PROPS}
         contentContainerStyle={[styles.feed, { paddingBottom: rh(12) }]}
         refreshControl={
           <RefreshControl refreshing={isRefreshing} onRefresh={refreshPosts}
             colors={[t.accent]} tintColor={t.accent} />
         }
-        ListHeaderComponent={
-          <>
-            {/* Stories strip */}
-            <View style={[styles.storiesCard, { backgroundColor: t.card, borderColor: t.border }]}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.storiesRow}>
-                {STORIES.map(s => <StoryBubble key={s.id} item={s} theme={t} />)}
-              </ScrollView>
-            </View>
-
-            {/* Composer */}
-            <TouchableOpacity
-              style={[styles.composer, { backgroundColor: t.card, borderColor: t.border }]}
-              onPress={handleCreatePost}
-              activeOpacity={0.7}
-            >
-              {user?.avatar ? (
-                <Image source={{ uri: user.avatar }} style={[styles.composerAvatar, { borderColor: t.border }]} />
-              ) : (
-                <View style={[styles.composerAvatarCircle, { backgroundColor: t.accent }]}>
-                  <Text style={styles.composerAvatarText}>{initials}</Text>
-                </View>
-              )}
-              <Text style={[styles.composerHint, { color: t.placeholder }]}>
-                What's on your mind, {user?.name?.split(' ')[0] ?? 'there'}?
-              </Text>
-              <View style={styles.composerIcons}>
-                <Text style={styles.composerIcon}>🖼</Text>
-              </View>
-            </TouchableOpacity>
-
-            {feedPosts.length > 0 && (
-              <View style={styles.feedLabel}>
-                <View style={[styles.feedLabelLine, { backgroundColor: t.border }]} />
-                <Text style={[styles.feedLabelText, { color: t.subtext }]}>Recent Posts</Text>
-                <View style={[styles.feedLabelLine, { backgroundColor: t.border }]} />
-              </View>
-            )}
-          </>
-        }
+        ListHeaderComponent={listHeader}
         ListEmptyComponent={<EmptyFeed onCreatePost={handleCreatePost} hasFollows={hasFollows} />}
-        renderItem={({ item, index }) => (
-          <PostCard
-            post={item} index={index} currentUserId={user?.id ?? ''}
-            onLike={handleLike} onComment={handleComment}
-            onEdit={handleEdit} onDelete={handleDelete} onViewProfile={handleViewProfile}
-          />
-        )}
+        renderItem={renderPost}
       />
 
       {hasNewActivity && <NewActivityBanner onPress={handleNewActivityPress} />}

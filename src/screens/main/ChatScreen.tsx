@@ -24,6 +24,7 @@ import { messageService, ChatMessage } from '../../services/messageService';
 import { formatTimeAgo } from '../../utils/formatTime';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import { useTheme } from '../../utils/theme';
+import { FLAT_LIST_PERF_PROPS } from '../../utils/listPerformance';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'Chat'>;
 type Route = RouteProp<HomeStackParamList, 'Chat'>;
@@ -127,6 +128,7 @@ const ChatScreen: React.FC = () => {
         data={messages}
         keyExtractor={item => item.id}
         style={styles.messageList}
+        {...FLAT_LIST_PERF_PROPS}
         contentContainerStyle={[
           styles.messageListContent,
           messages.length === 0 && styles.messageListEmpty,

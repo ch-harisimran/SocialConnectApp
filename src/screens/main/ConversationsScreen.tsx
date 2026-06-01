@@ -17,6 +17,7 @@ import { Conversation } from '../../services/messageService';
 import { formatTimeAgo } from '../../utils/formatTime';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import { useTheme } from '../../utils/theme';
+import { FLAT_LIST_PERF_PROPS } from '../../utils/listPerformance';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'Conversations'>;
 
@@ -114,6 +115,7 @@ const ConversationsScreen: React.FC = () => {
         <FlatList
           data={conversations}
           keyExtractor={item => item.id}
+          {...FLAT_LIST_PERF_PROPS}
           contentContainerStyle={[
             styles.list,
             conversations.length === 0 && styles.listEmpty,

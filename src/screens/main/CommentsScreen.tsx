@@ -6,7 +6,6 @@ import {
   FlatList,
   TouchableOpacity,
   TextInput,
-  Image,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
@@ -21,6 +20,8 @@ import { Comment } from '../../services/mockPosts';
 import { formatTimeAgo } from '../../utils/formatTime';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import AnimatedHeartButton from '../../components/AnimatedHeartButton';
+import OptimizedImage from '../../components/OptimizedImage';
+import { FLAT_LIST_PERF_PROPS } from '../../utils/listPerformance';
 import { useTheme } from '../../utils/theme';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'Comments'>;
@@ -49,7 +50,7 @@ const CommentItem = memo<{
         activeOpacity={0.7}
       >
         {comment.authorAvatar ? (
-          <Image source={{ uri: comment.authorAvatar }} style={styles.commentAvatar} />
+          <OptimizedImage uri={comment.authorAvatar} style={styles.commentAvatar} priority="low" />
         ) : (
           <View style={[styles.commentAvatarCircle, { backgroundColor: t.accent }]}>
             <Text style={styles.commentAvatarText}>{initials}</Text>
@@ -179,10 +180,7 @@ const CommentsScreen: React.FC = () => {
         keyExtractor={item => item.id}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
-        removeClippedSubviews
-        maxToRenderPerBatch={10}
-        initialNumToRender={8}
-        windowSize={10}
+        {...FLAT_LIST_PERF_PROPS}
         contentContainerStyle={[styles.listContent, { backgroundColor: t.bg }]}
         ListHeaderComponent={
           <>
@@ -194,7 +192,7 @@ const CommentsScreen: React.FC = () => {
                 activeOpacity={0.7}
               >
                 {post.authorAvatar ? (
-                  <Image source={{ uri: post.authorAvatar }} style={styles.postAvatar} />
+                  <OptimizedImage uri={post.authorAvatar} style={styles.postAvatar} priority="normal" />
                 ) : (
                   <View style={[styles.postAvatarCircle, { backgroundColor: t.accentLight }]}>
                     <Text style={[styles.postAvatarText, { color: t.accent }]}>{postInitials}</Text>
@@ -211,10 +209,11 @@ const CommentsScreen: React.FC = () => {
               <Text style={[styles.postContent, { color: t.text }]}>{post.content}</Text>
 
               {post.imageUri ? (
-                <Image
-                  source={{ uri: post.imageUri }}
+                <OptimizedImage
+                  uri={post.imageUri}
                   style={styles.postImage}
-                  resizeMode="cover"
+                  priority="low"
+                  recyclingKey={`comments-post-${post.id}`}
                 />
               ) : null}
 
@@ -278,7 +277,7 @@ const CommentsScreen: React.FC = () => {
         ]}
       >
         {user?.avatar ? (
-          <Image source={{ uri: user.avatar }} style={styles.inputAvatar} />
+          <OptimizedImage uri={user.avatar} style={styles.inputAvatar} priority="high" />
         ) : (
           <View style={[styles.inputAvatarCircle, { backgroundColor: t.accent }]}>
             <Text style={styles.inputAvatarText}>
