@@ -128,7 +128,9 @@ export const mockPostsService = {
     updates: { content: string; imageUri: string | null }
   ): Promise<Post> {
     const trimmed = updates.content.trim();
-    if (!trimmed) throw new Error('Post content cannot be empty.');
+    if (!trimmed && !updates.imageUri) {
+      throw new Error('Post must have text or an image.');
+    }
 
     const posts = await getPosts();
     const index = posts.findIndex(p => p.id === postId);

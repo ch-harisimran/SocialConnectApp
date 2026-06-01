@@ -13,11 +13,12 @@ import {
   Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import * as ImagePicker from 'expo-image-picker';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { usePosts } from '../../context/PostsContext';
 import { useAuth } from '../../context/AuthContext';
+import { imageUploadService } from '../../services/imageUploadService';
+import { imagePicker } from '../../utils/imagePicker';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import { useTheme } from '../../utils/theme';
 
@@ -57,59 +58,34 @@ const CreatePostScreen: React.FC = () => {
   }, [editPostId, posts, navigation, isLoaded]);
 
   const charsLeft = MAX_CHARS - content.length;
-  const canPost = content.trim().length > 0 && charsLeft >= 0 && !isSubmitting;
+  const hasText = content.trim().length > 0;
+  const hasImage = imageUri !== null;
+  const canPost = (hasText || hasImage) && charsLeft >= 0 && !isSubmitting;
 
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow access to your photo library.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'] as ImagePicker.MediaType[],
-      allowsEditing: true,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets.length > 0) {
-      setImageUri(result.assets[0].uri);
-    }
-  };
-
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert('Permission required', 'Please allow camera access.');
-      return;
-    }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets.length > 0) {
-      setImageUri(result.assets[0].uri);
-    }
-  };
-
-  const showImageOptions = () => {
-    Alert.alert('Add Photo', 'Choose a source', [
-      { text: 'Camera', onPress: takePhoto },
-      { text: 'Photo Library', onPress: pickImage },
-      { text: 'Cancel', style: 'cancel' },
-    ]);
+  const handleSelectImage = () => {
+    imagePicker.showPickerOptions(uri => setImageUri(uri));
   };
 
   const handlePost = async () => {
-    if (!canPost) return;
+    if (!canPost || !user) return;
     setIsSubmitting(true);
     try {
+      let uploadedImageUri = imageUri;
+      if (imageUri) {
+        uploadedImageUri = await imageUploadService.uploadPostImage(imageUri, user.id);
+      }
+
       if (isEditing && editPostId) {
-        await updatePost(editPostId, content.trim(), imageUri);
+        await updatePost(editPostId, content.trim(), uploadedImageUri);
       } else {
-        await createPost(content.trim(), imageUri);
+        await createPost(content.trim(), uploadedImageUri);
       }
       navigation.goBack();
-    } catch {
-      Alert.alert('Error', `Failed to ${isEditing ? 'update' : 'create'} post. Please try again.`);
+    } catch (err) {
+      Alert.alert(
+        'Error',
+        err instanceof Error ? err.message : `Failed to ${isEditing ? 'update' : 'create'} post.`
+      );
       setIsSubmitting(false);
     }
   };
@@ -118,7 +94,7 @@ const CreatePostScreen: React.FC = () => {
     const hasChanges = isEditing
       ? posts.find(p => p.id === editPostId)?.content !== content.trim() ||
         posts.find(p => p.id === editPostId)?.imageUri !== imageUri
-      : content.trim().length > 0 || imageUri;
+      : hasText || hasImage;
 
     if (!hasChanges) {
       navigation.goBack();
@@ -148,7 +124,6 @@ const CreatePostScreen: React.FC = () => {
       style={[styles.flex, { backgroundColor: t.bg }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      {/* Navbar with safe area */}
       <View
         style={[
           styles.navbar,
@@ -209,20 +184,50 @@ const CreatePostScreen: React.FC = () => {
           </View>
         </View>
 
-        {imageUri ? (
-          <View style={styles.imagePreviewWrapper}>
-            <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="cover" />
-            <TouchableOpacity style={styles.removeImageBtn} onPress={() => setImageUri(null)}>
-              <Text style={styles.removeImageText}>✕</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
+        <View style={styles.mediaSection}>
+          <Text style={[styles.mediaSectionTitle, { color: t.subtext }]}>Photo</Text>
 
-        {/* Subtle separator before toolbar area */}
-        <View style={{ height: 60 }} />
+          {imageUri ? (
+            <View style={[styles.imagePreviewWrapper, { borderColor: t.border }]}>
+              <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="cover" />
+              <View style={styles.previewBadge}>
+                <Text style={styles.previewBadgeText}>Preview</Text>
+              </View>
+              <View style={styles.previewActions}>
+                <TouchableOpacity
+                  style={[styles.previewActionBtn, { backgroundColor: 'rgba(0,0,0,0.65)' }]}
+                  onPress={handleSelectImage}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.previewActionText}>Change</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.previewActionBtn, { backgroundColor: 'rgba(0,0,0,0.65)' }]}
+                  onPress={() => setImageUri(null)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.previewActionText, { color: '#FCA5A5' }]}>Remove</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <TouchableOpacity
+              style={[styles.addImageBox, { borderColor: t.border, backgroundColor: t.inputBg }]}
+              onPress={handleSelectImage}
+              activeOpacity={0.75}
+            >
+              <Text style={styles.addImageIcon}>🖼</Text>
+              <Text style={[styles.addImageTitle, { color: t.text }]}>Add a photo</Text>
+              <Text style={[styles.addImageSub, { color: t.subtext }]}>
+                Tap to take a photo or choose from your library
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={{ height: 24 }} />
       </ScrollView>
 
-      {/* Toolbar */}
       <View
         style={[
           styles.toolbar,
@@ -233,20 +238,16 @@ const CreatePostScreen: React.FC = () => {
           },
         ]}
       >
-        <TouchableOpacity style={styles.toolbarBtn} onPress={showImageOptions}>
-          <Text style={styles.toolbarIcon}>🖼</Text>
-          <Text style={[styles.toolbarLabel, { color: t.accent }]}>Photo</Text>
+        <TouchableOpacity style={styles.toolbarBtn} onPress={handleSelectImage}>
+          <Text style={styles.toolbarIcon}>📷</Text>
+          <Text style={[styles.toolbarLabel, { color: t.accent }]}>
+            {imageUri ? 'Change Photo' : 'Add Photo'}
+          </Text>
         </TouchableOpacity>
 
-        {/* Circular progress ring + count */}
         <View style={styles.charGroup}>
           <Text style={[styles.charCountText, { color: progressColor }]}>{charsLeft}</Text>
-          <View
-            style={[
-              styles.progressBar,
-              { backgroundColor: t.border },
-            ]}
-          >
+          <View style={[styles.progressBar, { backgroundColor: t.border }]}>
             <View
               style={[
                 styles.progressFill,
@@ -308,26 +309,58 @@ const styles = StyleSheet.create({
     minHeight: 120,
     textAlignVertical: 'top',
   },
+  mediaSection: {
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  mediaSectionTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+  addImageBox: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    paddingVertical: 32,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+  },
+  addImageIcon: { fontSize: 36, marginBottom: 10 },
+  addImageTitle: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
+  addImageSub: { fontSize: 13, textAlign: 'center', lineHeight: 19 },
   imagePreviewWrapper: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderRadius: 14,
+    borderRadius: 16,
     overflow: 'hidden',
     position: 'relative',
+    borderWidth: StyleSheet.hairlineWidth,
   },
-  imagePreview: { width: '100%', height: 220, borderRadius: 14 },
-  removeImageBtn: {
+  imagePreview: { width: '100%', height: 260 },
+  previewBadge: {
     position: 'absolute',
-    top: 10,
-    right: 10,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
+    top: 12,
+    left: 12,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
   },
-  removeImageText: { color: '#fff', fontSize: 13, fontWeight: '700' },
+  previewBadgeText: { color: '#fff', fontSize: 11, fontWeight: '700', letterSpacing: 0.5 },
+  previewActions: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    flexDirection: 'row',
+    gap: 8,
+  },
+  previewActionBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  previewActionText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   toolbar: {
     flexDirection: 'row',
     alignItems: 'center',
