@@ -11,7 +11,13 @@ export type ProfileStackParamList = {
 const Stack = createNativeStackNavigator<ProfileStackParamList>();
 
 const ProfileStackNavigator: React.FC = () => (
-  <Stack.Navigator screenOptions={{ headerShown: false }}>
+  <Stack.Navigator
+    screenOptions={{
+      headerShown: false,
+      animation: 'slide_from_right',
+      animationDuration: 220,
+    }}
+  >
     <Stack.Screen name="Profile" component={ProfileScreen} />
     <Stack.Screen name="EditProfile" component={EditProfileScreen} />
   </Stack.Navigator>

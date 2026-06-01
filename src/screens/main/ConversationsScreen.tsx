@@ -15,10 +15,10 @@ import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { loadConversations } from '../../store/slices/messagesSlice';
 import { Conversation } from '../../services/messageService';
 import { formatTimeAgo } from '../../utils/formatTime';
-import { MessagesStackParamList } from '../../navigation/MessagesStackNavigator';
+import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import { useTheme } from '../../utils/theme';
 
-type Nav = NativeStackNavigationProp<MessagesStackParamList, 'Conversations'>;
+type Nav = NativeStackNavigationProp<HomeStackParamList, 'Conversations'>;
 
 const ConversationRow: React.FC<{
   conversation: Conversation;
@@ -99,7 +99,11 @@ const ConversationsScreen: React.FC = () => {
           },
         ]}
       >
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn} hitSlop={8}>
+          <Text style={[styles.backText, { color: t.accent }]}>←</Text>
+        </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: t.text }]}>Messages</Text>
+        <View style={styles.backBtn} />
       </View>
 
       {isLoading ? (
@@ -140,11 +144,16 @@ const ConversationsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingBottom: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  headerTitle: { fontSize: 24, fontWeight: '800', letterSpacing: -0.5 },
+  backBtn: { width: 36 },
+  backText: { fontSize: 24 },
+  headerTitle: { fontSize: 17, fontWeight: '700', flex: 1, textAlign: 'center' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list: { padding: 14, gap: 10 },
   listEmpty: { flexGrow: 1 },

@@ -22,11 +22,11 @@ import {
 } from '../../store/slices/messagesSlice';
 import { messageService, ChatMessage } from '../../services/messageService';
 import { formatTimeAgo } from '../../utils/formatTime';
-import { MessagesStackParamList } from '../../navigation/MessagesStackNavigator';
+import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import { useTheme } from '../../utils/theme';
 
-type Nav = NativeStackNavigationProp<MessagesStackParamList, 'Chat'>;
-type Route = RouteProp<MessagesStackParamList, 'Chat'>;
+type Nav = NativeStackNavigationProp<HomeStackParamList, 'Chat'>;
+type Route = RouteProp<HomeStackParamList, 'Chat'>;
 
 const MessageBubble: React.FC<{ message: ChatMessage; isOwn: boolean }> = ({ message, isOwn }) => {
   const t = useTheme();

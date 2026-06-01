@@ -13,7 +13,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, CommonActions } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { usePosts } from '../../context/PostsContext';
 import { useAuth } from '../../context/AuthContext';
@@ -382,6 +382,12 @@ const HomeScreen: React.FC = () => {
       navigation.navigate('UserProfile', { userId: authorId, userName: authorName }),
     [navigation]
   );
+  const handleGoToProfileTab = useCallback(() => {
+    navigation.dispatch(CommonActions.navigate({ name: 'Profile' }));
+  }, [navigation]);
+  const handleOpenMessages = useCallback(() => {
+    navigation.navigate('Conversations');
+  }, [navigation]);
   const handleCreatePost = useCallback(() => {
     Animated.sequence([
       Animated.parallel([
@@ -441,13 +447,20 @@ const HomeScreen: React.FC = () => {
         <View style={styles.headerRight}>
           <TouchableOpacity
             style={[styles.headerBtn, { backgroundColor: t.inputBg }]}
+            onPress={handleOpenMessages}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.headerBtnIcon, { color: t.accent }]}>💬</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerBtn, { backgroundColor: t.inputBg }]}
             onPress={handleCreatePost}
             activeOpacity={0.75}
           >
             <Text style={[styles.headerBtnIcon, { color: t.accent }]}>✏️</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => navigation.navigate('UserProfile', { userId: user?.id ?? '', userName: user?.name ?? '' })}
+            onPress={handleGoToProfileTab}
             activeOpacity={0.8}
           >
             {user?.avatar ? (

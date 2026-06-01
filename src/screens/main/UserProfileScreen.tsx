@@ -12,7 +12,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { usePosts } from '../../context/PostsContext';
 import { useAuth } from '../../context/AuthContext';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -26,7 +25,6 @@ import { mockAuth } from '../../services/mockAuth';
 import { Post } from '../../services/mockPosts';
 import { formatTimeAgo } from '../../utils/formatTime';
 import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
-import { MainTabParamList } from '../../navigation/MainNavigator';
 import { useTheme } from '../../utils/theme';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'UserProfile'>;
@@ -171,14 +169,10 @@ const UserProfileScreen: React.FC = () => {
         startConversation({ otherUserId: userId, otherUserName: displayName })
       );
       if (startConversation.fulfilled.match(result)) {
-        const tabNav = navigation.getParent<BottomTabNavigationProp<MainTabParamList>>();
-        tabNav?.navigate('Messages', {
-          screen: 'Chat',
-          params: {
-            conversationId: result.payload.id,
-            otherUserId: userId,
-            otherUserName: displayName,
-          },
+        navigation.navigate('Chat', {
+          conversationId: result.payload.id,
+          otherUserId: userId,
+          otherUserName: displayName,
         });
       }
     } finally {

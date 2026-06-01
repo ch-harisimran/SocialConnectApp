@@ -173,6 +173,9 @@ const SettingsScreen: React.FC = () => {
 
         {/* ── Account ── */}
         <SectionCard title="Account" bgColor={t.card} borderColor={t.border} titleColor={t.subtext}>
+          <SettingRow {...rowProps} icon="💬" iconBg="#EDE9FE" label="Messages"
+            sublabel="View your conversations"
+            onPress={() => navigation.navigate('Home', { screen: 'Conversations' })} />
           <SettingRow {...rowProps} icon="✏️" iconBg="#EEF2FF" label="Edit Profile"
             sublabel="Name, bio and photo"
             onPress={() => navigation.navigate('Profile', { screen: 'EditProfile' })} />
@@ -225,7 +228,7 @@ const SettingsScreen: React.FC = () => {
           />
         </View>
 
-        <View style={{ height: insets.bottom + 24 }} />
+        <View style={{ height: insets.bottom + 80 }} />
       </View>
     </ScrollView>
   );

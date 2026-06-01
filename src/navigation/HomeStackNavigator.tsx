@@ -6,6 +6,12 @@ export type HomeStackParamList = {
   CreatePost: { postId?: string } | undefined;
   Comments: { postId: string };
   UserProfile: { userId: string; userName: string };
+  Conversations: undefined;
+  Chat: {
+    conversationId: string;
+    otherUserId: string;
+    otherUserName: string;
+  };
 };
 
 const Stack = createNativeStackNavigator<HomeStackParamList>();
@@ -34,6 +40,14 @@ const HomeStackNavigator: React.FC = () => (
     <Stack.Screen
       name="UserProfile"
       getComponent={() => require('../screens/main/UserProfileScreen').default}
+    />
+    <Stack.Screen
+      name="Conversations"
+      getComponent={() => require('../screens/main/ConversationsScreen').default}
+    />
+    <Stack.Screen
+      name="Chat"
+      getComponent={() => require('../screens/main/ChatScreen').default}
     />
   </Stack.Navigator>
 );
