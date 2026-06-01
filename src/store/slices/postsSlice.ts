@@ -1,6 +1,7 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { mockPostsService, Post } from '../../services/mockPosts';
 import { notificationService } from '../../services/notificationService';
+import { supabaseSyncService } from '../../services/supabaseSyncService';
 import { showToast } from './uiSlice';
 import type { RootState } from '../index';
 
@@ -23,11 +24,16 @@ const initialState: PostsState = {
 };
 
 export const fetchPosts = createAsyncThunk('posts/fetchPosts', async () => {
-  return await mockPostsService.fetchPosts();
+  const posts = await mockPostsService.fetchPosts();
+  supabaseSyncService.syncAllPosts(posts);
+  supabaseSyncService.syncAllProfiles();
+  return posts;
 });
 
 export const refreshPosts = createAsyncThunk('posts/refreshPosts', async () => {
-  return await mockPostsService.fetchPosts();
+  const posts = await mockPostsService.fetchPosts();
+  supabaseSyncService.syncAllPosts(posts);
+  return posts;
 });
 
 export const createPost = createAsyncThunk(

@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { supabaseSyncService } from './supabaseSyncService';
 
 const POSTS_KEY = '@social_connect_posts';
 
@@ -57,6 +58,7 @@ export const mockPostsService = {
       comments: [],
     };
     await savePosts([newPost, ...posts]);
+    await supabaseSyncService.upsertPost(newPost);
     return newPost;
   },
 
@@ -72,6 +74,7 @@ export const mockPostsService = {
       likes: alreadyLiked ? post.likes.filter(id => id !== userId) : [...post.likes, userId],
     };
     await savePosts(posts);
+    await supabaseSyncService.upsertPost(posts[index]);
     return posts[index];
   },
 
@@ -120,6 +123,7 @@ export const mockPostsService = {
     if (!post) throw new Error('Post not found.');
     if (post.authorId !== userId) throw new Error('You can only delete your own posts.');
     await savePosts(posts.filter(p => p.id !== postId));
+    await supabaseSyncService.deletePost(postId);
   },
 
   async updatePost(
@@ -143,6 +147,7 @@ export const mockPostsService = {
       imageUri: updates.imageUri,
     };
     await savePosts(posts);
+    await supabaseSyncService.upsertPost(posts[index]);
     return posts[index];
   },
 };

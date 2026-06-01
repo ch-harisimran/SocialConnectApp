@@ -7,6 +7,7 @@ export type HomeStackParamList = {
   Comments: { postId: string };
   UserProfile: { userId: string; userName: string };
   Conversations: undefined;
+  Search: undefined;
   Chat: {
     conversationId: string;
     otherUserId: string;
@@ -44,6 +45,10 @@ const HomeStackNavigator: React.FC = () => (
     <Stack.Screen
       name="Conversations"
       getComponent={() => require('../screens/main/ConversationsScreen').default}
+    />
+    <Stack.Screen
+      name="Search"
+      getComponent={() => require('../screens/main/SearchScreen').default}
     />
     <Stack.Screen
       name="Chat"

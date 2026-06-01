@@ -388,6 +388,9 @@ const HomeScreen: React.FC = () => {
   const handleOpenMessages = useCallback(() => {
     navigation.navigate('Conversations');
   }, [navigation]);
+  const handleOpenSearch = useCallback(() => {
+    navigation.navigate('Search');
+  }, [navigation]);
   const handleCreatePost = useCallback(() => {
     Animated.sequence([
       Animated.parallel([
@@ -445,6 +448,13 @@ const HomeScreen: React.FC = () => {
           </View>
         </View>
         <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={[styles.headerBtn, { backgroundColor: t.inputBg }]}
+            onPress={handleOpenSearch}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.headerBtnIcon, { color: t.accent }]}>🔍</Text>
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.headerBtn, { backgroundColor: t.inputBg }]}
             onPress={handleOpenMessages}
