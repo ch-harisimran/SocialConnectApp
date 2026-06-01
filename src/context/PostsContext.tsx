@@ -5,6 +5,7 @@ import {
   fetchPosts,
   refreshPosts as refreshPostsThunk,
   createPost as createPostThunk,
+  updatePost as updatePostThunk,
   toggleLike as toggleLikeThunk,
   addComment as addCommentThunk,
   deleteComment as deleteCommentThunk,
@@ -17,6 +18,7 @@ interface PostsContextType {
   isRefreshing: boolean;
   refreshPosts: () => Promise<void>;
   createPost: (content: string, imageUri: string | null) => Promise<void>;
+  updatePost: (postId: string, content: string, imageUri: string | null) => Promise<void>;
   toggleLike: (postId: string) => Promise<void>;
   addComment: (postId: string, text: string) => Promise<void>;
   deleteComment: (postId: string, commentId: string) => Promise<void>;
@@ -44,6 +46,16 @@ export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const result = await dispatch(createPostThunk({ content, imageUri }));
       if (createPostThunk.rejected.match(result)) {
         throw new Error(result.error.message ?? 'Failed to create post.');
+      }
+    },
+    [dispatch]
+  );
+
+  const updatePost = useCallback(
+    async (postId: string, content: string, imageUri: string | null) => {
+      const result = await dispatch(updatePostThunk({ postId, content, imageUri }));
+      if (updatePostThunk.rejected.match(result)) {
+        throw new Error(result.error.message ?? 'Failed to update post.');
       }
     },
     [dispatch]
@@ -87,6 +99,7 @@ export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       isRefreshing,
       refreshPosts,
       createPost,
+      updatePost,
       toggleLike,
       addComment,
       deleteComment,
@@ -98,6 +111,7 @@ export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       isRefreshing,
       refreshPosts,
       createPost,
+      updatePost,
       toggleLike,
       addComment,
       deleteComment,

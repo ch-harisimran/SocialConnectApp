@@ -107,11 +107,29 @@ export const deleteComment = createAsyncThunk(
 
 export const deletePost = createAsyncThunk(
   'posts/deletePost',
-  async (postId: string, { getState }) => {
+  async (postId: string, { getState, dispatch }) => {
     const { auth } = getState() as RootState;
     if (!auth.user) throw new Error('Not authenticated.');
     await mockPostsService.deletePost(postId, auth.user.id);
+    dispatch(showToast({ icon: '🗑️', message: 'Post deleted.', type: 'comment' }));
     return postId;
+  }
+);
+
+export const updatePost = createAsyncThunk(
+  'posts/updatePost',
+  async (
+    payload: { postId: string; content: string; imageUri: string | null },
+    { getState, dispatch }
+  ) => {
+    const { auth } = getState() as RootState;
+    if (!auth.user) throw new Error('Not authenticated.');
+    const updated = await mockPostsService.updatePost(payload.postId, auth.user.id, {
+      content: payload.content,
+      imageUri: payload.imageUri,
+    });
+    dispatch(showToast({ icon: '✏️', message: 'Post updated.', type: 'comment' }));
+    return updated;
   }
 );
 
@@ -175,6 +193,10 @@ const postsSlice = createSlice({
       })
       .addCase(deletePost.fulfilled, (state, action) => {
         state.posts = state.posts.filter(p => p.id !== action.payload);
+      })
+      .addCase(updatePost.fulfilled, (state, action) => {
+        const idx = state.posts.findIndex(p => p.id === action.payload.id);
+        if (idx !== -1) state.posts[idx] = action.payload;
       });
   },
 });

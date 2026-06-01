@@ -121,4 +121,26 @@ export const mockPostsService = {
     if (post.authorId !== userId) throw new Error('You can only delete your own posts.');
     await savePosts(posts.filter(p => p.id !== postId));
   },
+
+  async updatePost(
+    postId: string,
+    userId: string,
+    updates: { content: string; imageUri: string | null }
+  ): Promise<Post> {
+    const trimmed = updates.content.trim();
+    if (!trimmed) throw new Error('Post content cannot be empty.');
+
+    const posts = await getPosts();
+    const index = posts.findIndex(p => p.id === postId);
+    if (index === -1) throw new Error('Post not found.');
+    if (posts[index].authorId !== userId) throw new Error('You can only edit your own posts.');
+
+    posts[index] = {
+      ...posts[index],
+      content: trimmed,
+      imageUri: updates.imageUri,
+    };
+    await savePosts(posts);
+    return posts[index];
+  },
 };

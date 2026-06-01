@@ -3,7 +3,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 export type HomeStackParamList = {
   Home: undefined;
-  CreatePost: undefined;
+  CreatePost: { postId?: string } | undefined;
   Comments: { postId: string };
   UserProfile: { userId: string; userName: string };
 };

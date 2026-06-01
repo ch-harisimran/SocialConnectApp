@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
@@ -38,28 +39,58 @@ interface PublicProfile {
   avatar: string | null;
 }
 
-const PostTile: React.FC<{ post: Post; onPress: () => void }> = memo(({ post, onPress }) => {
+const PostTile: React.FC<{
+  post: Post;
+  isOwner: boolean;
+  onPress: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}> = memo(({ post, isOwner, onPress, onEdit, onDelete }) => {
   const t = useTheme();
+
+  const confirmDelete = () =>
+    Alert.alert('Delete post', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: onDelete },
+    ]);
+
   return (
-    <TouchableOpacity
-      style={[styles.postCard, { backgroundColor: t.card, borderColor: t.border }]}
-      onPress={onPress}
-      activeOpacity={0.85}
-    >
-      <Text style={[styles.postContent, { color: t.text }]} numberOfLines={3}>
-        {post.content}
-      </Text>
-      {post.imageUri ? (
-        <Image source={{ uri: post.imageUri }} style={styles.postImage} resizeMode="cover" />
-      ) : null}
-      <View style={[styles.postMeta, { borderTopColor: t.border }]}>
-        <Text style={[styles.postTime, { color: t.subtext }]}>{formatTimeAgo(post.createdAt)}</Text>
-        <View style={styles.postStats}>
-          <Text style={[styles.postStat, { color: t.accent }]}>♥ {post.likes.length}</Text>
-          <Text style={[styles.postStat, { color: t.subtext }]}>💬 {post.comments.length}</Text>
+    <View style={[styles.postCard, { backgroundColor: t.card, borderColor: t.border }]}>
+      <TouchableOpacity onPress={onPress} activeOpacity={0.85}>
+        <Text style={[styles.postContent, { color: t.text }]} numberOfLines={3}>
+          {post.content}
+        </Text>
+        {post.imageUri ? (
+          <Image source={{ uri: post.imageUri }} style={styles.postImage} resizeMode="cover" />
+        ) : null}
+        <View style={[styles.postMeta, { borderTopColor: t.border }]}>
+          <Text style={[styles.postTime, { color: t.subtext }]}>{formatTimeAgo(post.createdAt)}</Text>
+          <View style={styles.postStats}>
+            <Text style={[styles.postStat, { color: t.accent }]}>♥ {post.likes.length}</Text>
+            <Text style={[styles.postStat, { color: t.subtext }]}>💬 {post.comments.length}</Text>
+          </View>
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+
+      {isOwner && (
+        <View style={[styles.postOwnerActions, { borderTopColor: t.border }]}>
+          <TouchableOpacity
+            style={[styles.postOwnerBtn, { backgroundColor: t.inputBg }]}
+            onPress={onEdit}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.postOwnerBtnText, { color: t.accent }]}>✏️ Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.postOwnerBtn, { backgroundColor: t.inputBg }]}
+            onPress={confirmDelete}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.postOwnerBtnText, { color: t.danger }]}>🗑 Delete</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
   );
 });
 PostTile.displayName = 'PostTile';
@@ -72,7 +103,7 @@ const UserProfileScreen: React.FC = () => {
   const t = useTheme();
 
   const dispatch = useAppDispatch();
-  const { posts } = usePosts();
+  const { posts, deletePost } = usePosts();
   const { user: currentUser } = useAuth();
 
   const profileFollowState = useAppSelector(state => state.follows.profileStates[userId]);
@@ -308,7 +339,10 @@ const UserProfileScreen: React.FC = () => {
       renderItem={({ item }) => (
         <PostTile
           post={item}
+          isOwner={isOwnProfile}
           onPress={() => navigation.navigate('Comments', { postId: item.id })}
+          onEdit={() => navigation.navigate('CreatePost', { postId: item.id })}
+          onDelete={() => deletePost(item.id)}
         />
       )}
       ListEmptyComponent={
@@ -427,6 +461,15 @@ const styles = StyleSheet.create({
   postTime: { fontSize: 12 },
   postStats: { flexDirection: 'row', gap: 12 },
   postStat: { fontSize: 12, fontWeight: '500' },
+  postOwnerActions: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  postOwnerBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14 },
+  postOwnerBtnText: { fontSize: 12, fontWeight: '700' },
   emptyContainer: { alignItems: 'center', paddingTop: 48 },
   emptyText: { fontSize: 14, fontStyle: 'italic' },
 });

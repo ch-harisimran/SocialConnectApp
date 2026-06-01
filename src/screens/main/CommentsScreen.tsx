@@ -89,7 +89,7 @@ const CommentsScreen: React.FC = () => {
   const insets = useSafeAreaInsets();
   const t = useTheme();
 
-  const { posts, toggleLike, addComment, deleteComment } = usePosts();
+  const { posts, toggleLike, addComment, deleteComment, deletePost } = usePosts();
   const { user } = useAuth();
 
   const post = posts.find(p => p.id === postId);
@@ -129,6 +129,26 @@ const CommentsScreen: React.FC = () => {
 
   const handleViewProfile = (authorId: string, authorName: string) => {
     navigation.navigate('UserProfile', { userId: authorId, userName: authorName });
+  };
+
+  const isOwner = post.authorId === user?.id;
+
+  const handleEditPost = () => {
+    navigation.navigate('CreatePost', { postId: post.id });
+  };
+
+  const handleDeletePost = () => {
+    Alert.alert('Delete post', 'This cannot be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          await deletePost(post.id);
+          navigation.goBack();
+        },
+      },
+    ]);
   };
 
   return (
@@ -210,6 +230,25 @@ const CommentsScreen: React.FC = () => {
                   {post.comments.length === 1 ? 'comment' : 'comments'}
                 </Text>
               </View>
+
+              {isOwner && (
+                <View style={[styles.postOwnerActions, { borderTopColor: t.border }]}>
+                  <TouchableOpacity
+                    style={[styles.postOwnerBtn, { backgroundColor: t.inputBg }]}
+                    onPress={handleEditPost}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.postOwnerBtnText, { color: t.accent }]}>✏️ Edit</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.postOwnerBtn, { backgroundColor: t.inputBg }]}
+                    onPress={handleDeletePost}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.postOwnerBtnText, { color: t.danger }]}>🗑 Delete</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
             <Text style={[styles.commentsLabel, { color: t.subtext }]}>
@@ -333,6 +372,15 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
   },
   commentCount: { fontSize: 14, fontWeight: '500' },
+  postOwnerActions: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  postOwnerBtn: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 14 },
+  postOwnerBtnText: { fontSize: 12, fontWeight: '700' },
   commentsLabel: {
     fontSize: 12,
     fontWeight: '700',

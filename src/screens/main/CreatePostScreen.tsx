@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { usePosts } from '../../context/PostsContext';
 import { useAuth } from '../../context/AuthContext';
@@ -22,19 +22,39 @@ import { HomeStackParamList } from '../../navigation/HomeStackNavigator';
 import { useTheme } from '../../utils/theme';
 
 type Nav = NativeStackNavigationProp<HomeStackParamList, 'CreatePost'>;
+type Route = RouteProp<HomeStackParamList, 'CreatePost'>;
 
 const MAX_CHARS = 500;
 
 const CreatePostScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
-  const { createPost } = usePosts();
+  const route = useRoute<Route>();
+  const editPostId = route.params?.postId;
+  const isEditing = Boolean(editPostId);
+
+  const { posts, createPost, updatePost } = usePosts();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const t = useTheme();
   const [content, setContent] = useState('');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoaded, setIsLoaded] = useState(!isEditing);
   const inputRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (!editPostId) return;
+    const post = posts.find(p => p.id === editPostId);
+    if (post) {
+      setContent(post.content);
+      setImageUri(post.imageUri);
+      setIsLoaded(true);
+    } else if (!isLoaded) {
+      Alert.alert('Post not found', 'This post may have been deleted.', [
+        { text: 'OK', onPress: () => navigation.goBack() },
+      ]);
+    }
+  }, [editPostId, posts, navigation, isLoaded]);
 
   const charsLeft = MAX_CHARS - content.length;
   const canPost = content.trim().length > 0 && charsLeft >= 0 && !isSubmitting;
@@ -82,24 +102,41 @@ const CreatePostScreen: React.FC = () => {
     if (!canPost) return;
     setIsSubmitting(true);
     try {
-      await createPost(content.trim(), imageUri);
+      if (isEditing && editPostId) {
+        await updatePost(editPostId, content.trim(), imageUri);
+      } else {
+        await createPost(content.trim(), imageUri);
+      }
       navigation.goBack();
     } catch {
-      Alert.alert('Error', 'Failed to create post. Please try again.');
+      Alert.alert('Error', `Failed to ${isEditing ? 'update' : 'create'} post. Please try again.`);
       setIsSubmitting(false);
     }
   };
 
   const handleDiscard = () => {
-    if (content.trim().length === 0 && !imageUri) {
+    const hasChanges = isEditing
+      ? posts.find(p => p.id === editPostId)?.content !== content.trim() ||
+        posts.find(p => p.id === editPostId)?.imageUri !== imageUri
+      : content.trim().length > 0 || imageUri;
+
+    if (!hasChanges) {
       navigation.goBack();
       return;
     }
-    Alert.alert('Discard post?', 'Your changes will be lost.', [
+    Alert.alert('Discard changes?', 'Your changes will be lost.', [
       { text: 'Keep editing', style: 'cancel' },
       { text: 'Discard', style: 'destructive', onPress: () => navigation.goBack() },
     ]);
   };
+
+  if (!isLoaded) {
+    return (
+      <View style={[styles.flex, styles.center, { backgroundColor: t.bg }]}>
+        <ActivityIndicator size="large" color={t.accent} />
+      </View>
+    );
+  }
 
   const initials = user?.name?.slice(0, 2).toUpperCase() ?? 'U';
   const progressPct = Math.min(content.length / MAX_CHARS, 1);
@@ -125,7 +162,9 @@ const CreatePostScreen: React.FC = () => {
         <TouchableOpacity onPress={handleDiscard} style={styles.navBtn}>
           <Text style={[styles.navCancel, { color: t.subtext }]}>Cancel</Text>
         </TouchableOpacity>
-        <Text style={[styles.navTitle, { color: t.text }]}>New Post</Text>
+        <Text style={[styles.navTitle, { color: t.text }]}>
+          {isEditing ? 'Edit Post' : 'New Post'}
+        </Text>
         <TouchableOpacity
           onPress={handlePost}
           disabled={!canPost}
@@ -137,7 +176,7 @@ const CreatePostScreen: React.FC = () => {
           {isSubmitting ? (
             <ActivityIndicator size="small" color="#fff" />
           ) : (
-            <Text style={styles.postBtnText}>Post</Text>
+            <Text style={styles.postBtnText}>{isEditing ? 'Save' : 'Post'}</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -226,6 +265,7 @@ const CreatePostScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  center: { alignItems: 'center', justifyContent: 'center' },
   navbar: {
     flexDirection: 'row',
     alignItems: 'center',

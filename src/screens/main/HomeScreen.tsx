@@ -11,7 +11,6 @@ import {
   Alert,
   Animated,
   ScrollView,
-  Pressable,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
@@ -133,12 +132,13 @@ interface PostCardProps {
   currentUserId: string;
   onLike: (id: string) => void;
   onComment: (id: string) => void;
+  onEdit: (id: string) => void;
   onDelete: (id: string) => void;
   onViewProfile: (authorId: string, authorName: string) => void;
 }
 
 const PostCard = memo<PostCardProps>(
-  ({ post, index, currentUserId, onLike, onComment, onDelete, onViewProfile }) => {
+  ({ post, index, currentUserId, onLike, onComment, onEdit, onDelete, onViewProfile }) => {
     const t = useTheme();
     const liked = post.likes.includes(currentUserId);
     const isOwner = post.authorId === currentUserId;
@@ -204,9 +204,22 @@ const PostCard = memo<PostCardProps>(
           </TouchableOpacity>
 
           {isOwner && (
-            <Pressable onPress={confirmDelete} style={cardStyles.menuBtn} hitSlop={10}>
-              <Text style={[cardStyles.menuIcon, { color: t.subtext }]}>•••</Text>
-            </Pressable>
+            <View style={cardStyles.ownerActions}>
+              <TouchableOpacity
+                style={[cardStyles.ownerBtn, { backgroundColor: t.inputBg }]}
+                onPress={() => onEdit(post.id)}
+                activeOpacity={0.7}
+              >
+                <Text style={[cardStyles.ownerBtnText, { color: t.accent }]}>✏️ Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[cardStyles.ownerBtn, { backgroundColor: t.inputBg }]}
+                onPress={confirmDelete}
+                activeOpacity={0.7}
+              >
+                <Text style={[cardStyles.ownerBtnText, { color: t.danger }]}>🗑 Delete</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
 
@@ -244,7 +257,8 @@ const PostCard = memo<PostCardProps>(
   (p, n) =>
     p.post === n.post && p.currentUserId === n.currentUserId &&
     p.onLike === n.onLike && p.onComment === n.onComment &&
-    p.onDelete === n.onDelete && p.onViewProfile === n.onViewProfile
+    p.onEdit === n.onEdit && p.onDelete === n.onDelete &&
+    p.onViewProfile === n.onViewProfile
 );
 PostCard.displayName = 'PostCard';
 
@@ -264,8 +278,9 @@ const cardStyles = StyleSheet.create({
   authorMeta: { flex: 1 },
   authorName: { fontSize: rf(1.65), fontWeight: '800' },
   postTime: { fontSize: rf(1.25), marginTop: 1 },
-  menuBtn: { padding: 4 },
-  menuIcon: { fontSize: 13, letterSpacing: 1 },
+  ownerActions: { flexDirection: 'row', gap: 6 },
+  ownerBtn: { paddingHorizontal: 10, paddingVertical: 6, borderRadius: 14 },
+  ownerBtnText: { fontSize: rf(1.25), fontWeight: '700' },
   content: { fontSize: rf(1.6), lineHeight: 24, paddingHorizontal: rw(4), paddingBottom: rh(1.2) },
   image: { width: '100%', height: rh(26), marginBottom: rh(1.2) },
   footer: {
@@ -354,6 +369,10 @@ const HomeScreen: React.FC = () => {
 
   const handleLike = useCallback((id: string) => toggleLike(id), [toggleLike]);
   const handleDelete = useCallback((id: string) => deletePost(id), [deletePost]);
+  const handleEdit = useCallback(
+    (id: string) => navigation.navigate('CreatePost', { postId: id }),
+    [navigation]
+  );
   const handleComment = useCallback(
     (id: string) => navigation.navigate('Comments', { postId: id }),
     [navigation]
@@ -500,7 +519,7 @@ const HomeScreen: React.FC = () => {
           <PostCard
             post={item} index={index} currentUserId={user?.id ?? ''}
             onLike={handleLike} onComment={handleComment}
-            onDelete={handleDelete} onViewProfile={handleViewProfile}
+            onEdit={handleEdit} onDelete={handleDelete} onViewProfile={handleViewProfile}
           />
         )}
       />
