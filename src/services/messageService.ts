@@ -1,25 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  collection,
-  doc,
-  setDoc,
-  getDoc,
-  getDocs,
-  addDoc,
-  query,
-  where,
-  orderBy,
-  onSnapshot,
-  serverTimestamp,
-  Timestamp,
-  Unsubscribe,
-} from 'firebase/firestore';
-import { getFirebaseDb, isFirebaseConfigured } from '../config/firebase';
+import { getSupabase, isSupabaseConfigured } from '../config/supabase';
 
 const CONVERSATIONS_KEY = '@social_connect_conversations';
 const MESSAGES_KEY = '@social_connect_messages';
-const CONVERSATIONS_COLLECTION = 'conversations';
-const MESSAGES_SUBCOLLECTION = 'messages';
 
 export interface Conversation {
   id: string;
@@ -38,14 +21,45 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+interface ConversationRow {
+  id: string;
+  participants: string[];
+  participant_names: Record<string, string>;
+  last_message: string | null;
+  last_message_at: string | null;
+  updated_at: string | null;
+}
+
+interface MessageRow {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  text: string;
+  created_at: string;
+}
+
 const conversationIdFor = (userIdA: string, userIdB: string): string =>
   [userIdA, userIdB].sort().join('_');
 
-const toIsoString = (value: unknown): string => {
-  if (value instanceof Timestamp) return value.toDate().toISOString();
-  if (typeof value === 'string') return value;
-  return new Date().toISOString();
-};
+const toIsoString = (value: string | null | undefined): string =>
+  value ? new Date(value).toISOString() : new Date().toISOString();
+
+const mapConversationRow = (row: ConversationRow): Conversation => ({
+  id: row.id,
+  participants: row.participants,
+  participantNames: row.participant_names ?? {},
+  lastMessage: row.last_message ?? '',
+  lastMessageAt: toIsoString(row.last_message_at),
+  updatedAt: toIsoString(row.updated_at),
+});
+
+const mapMessageRow = (row: MessageRow): ChatMessage => ({
+  id: row.id,
+  conversationId: row.conversation_id,
+  senderId: row.sender_id,
+  text: row.text,
+  createdAt: toIsoString(row.created_at),
+});
 
 const getLocalConversations = async (): Promise<Conversation[]> => {
   const raw = await AsyncStorage.getItem(CONVERSATIONS_KEY);
@@ -79,51 +93,44 @@ export const messageService = {
     }
 
     const id = conversationIdFor(currentUserId, otherUserId);
-    const db = getFirebaseDb();
+    const supabase = getSupabase();
 
-    if (db && isFirebaseConfigured()) {
-      const ref = doc(db, CONVERSATIONS_COLLECTION, id);
-      const snap = await getDoc(ref);
+    if (supabase && isSupabaseConfigured()) {
+      const { data: existing, error: fetchError } = await supabase
+        .from('conversations')
+        .select('*')
+        .eq('id', id)
+        .maybeSingle();
 
-      if (snap.exists()) {
-        const data = snap.data();
-        return {
-          id,
-          participants: data.participants as string[],
-          participantNames: data.participantNames as Record<string, string>,
-          lastMessage: (data.lastMessage as string) ?? '',
-          lastMessageAt: toIsoString(data.lastMessageAt),
-          updatedAt: toIsoString(data.updatedAt),
-        };
-      }
+      if (fetchError) throw new Error(fetchError.message);
+      if (existing) return mapConversationRow(existing as ConversationRow);
 
-      const now = serverTimestamp();
-      const conversation = {
+      const now = new Date().toISOString();
+      const payload = {
+        id,
         participants: [currentUserId, otherUserId],
-        participantNames: {
+        participant_names: {
           [currentUserId]: currentUserName,
           [otherUserId]: otherUserName,
         },
-        lastMessage: '',
-        lastMessageAt: now,
-        updatedAt: now,
+        last_message: '',
+        last_message_at: now,
+        updated_at: now,
       };
 
-      await setDoc(ref, conversation);
+      const { data: created, error: insertError } = await supabase
+        .from('conversations')
+        .insert(payload)
+        .select('*')
+        .single();
 
-      return {
-        id,
-        participants: conversation.participants,
-        participantNames: conversation.participantNames,
-        lastMessage: '',
-        lastMessageAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
+      if (insertError) throw new Error(insertError.message);
+      return mapConversationRow(created as ConversationRow);
     }
 
     const conversations = await getLocalConversations();
-    const existing = conversations.find(c => c.id === id);
-    if (existing) return existing;
+    const existingLocal = conversations.find(c => c.id === id);
+    if (existingLocal) return existingLocal;
 
     const now = new Date().toISOString();
     const newConversation: Conversation = {
@@ -143,29 +150,17 @@ export const messageService = {
   },
 
   async getConversations(userId: string): Promise<Conversation[]> {
-    const db = getFirebaseDb();
+    const supabase = getSupabase();
 
-    if (db && isFirebaseConfigured()) {
-      const q = query(
-        collection(db, CONVERSATIONS_COLLECTION),
-        where('participants', 'array-contains', userId)
-      );
-      const snap = await getDocs(q);
-      const conversations = snap.docs.map(d => {
-        const data = d.data();
-        return {
-          id: d.id,
-          participants: data.participants as string[],
-          participantNames: data.participantNames as Record<string, string>,
-          lastMessage: (data.lastMessage as string) ?? '',
-          lastMessageAt: toIsoString(data.lastMessageAt),
-          updatedAt: toIsoString(data.updatedAt),
-        };
-      });
+    if (supabase && isSupabaseConfigured()) {
+      const { data, error } = await supabase
+        .from('conversations')
+        .select('*')
+        .contains('participants', [userId])
+        .order('updated_at', { ascending: false });
 
-      return conversations.sort(
-        (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
-      );
+      if (error) throw new Error(error.message);
+      return (data ?? []).map(row => mapConversationRow(row as ConversationRow));
     }
 
     const conversations = await getLocalConversations();
@@ -175,24 +170,17 @@ export const messageService = {
   },
 
   async getMessages(conversationId: string): Promise<ChatMessage[]> {
-    const db = getFirebaseDb();
+    const supabase = getSupabase();
 
-    if (db && isFirebaseConfigured()) {
-      const q = query(
-        collection(db, CONVERSATIONS_COLLECTION, conversationId, MESSAGES_SUBCOLLECTION),
-        orderBy('createdAt', 'asc')
-      );
-      const snap = await getDocs(q);
-      return snap.docs.map(d => {
-        const data = d.data();
-        return {
-          id: d.id,
-          conversationId,
-          senderId: data.senderId as string,
-          text: data.text as string,
-          createdAt: toIsoString(data.createdAt),
-        };
-      });
+    if (supabase && isSupabaseConfigured()) {
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', conversationId)
+        .order('created_at', { ascending: true });
+
+      if (error) throw new Error(error.message);
+      return (data ?? []).map(row => mapMessageRow(row as MessageRow));
     }
 
     const messages = await getLocalMessages();
@@ -209,38 +197,35 @@ export const messageService = {
     const trimmed = text.trim();
     if (!trimmed) throw new Error('Message cannot be empty.');
 
-    const db = getFirebaseDb();
+    const supabase = getSupabase();
 
-    if (db && isFirebaseConfigured()) {
-      const messagesRef = collection(
-        db,
-        CONVERSATIONS_COLLECTION,
-        conversationId,
-        MESSAGES_SUBCOLLECTION
-      );
-      const docRef = await addDoc(messagesRef, {
-        senderId,
-        text: trimmed,
-        createdAt: serverTimestamp(),
-      });
+    if (supabase && isSupabaseConfigured()) {
+      const now = new Date().toISOString();
 
-      await setDoc(
-        doc(db, CONVERSATIONS_COLLECTION, conversationId),
-        {
-          lastMessage: trimmed,
-          lastMessageAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-        { merge: true }
-      );
+      const { data: inserted, error: insertError } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_id: senderId,
+          text: trimmed,
+        })
+        .select('*')
+        .single();
 
-      return {
-        id: docRef.id,
-        conversationId,
-        senderId,
-        text: trimmed,
-        createdAt: new Date().toISOString(),
-      };
+      if (insertError) throw new Error(insertError.message);
+
+      const { error: updateError } = await supabase
+        .from('conversations')
+        .update({
+          last_message: trimmed,
+          last_message_at: now,
+          updated_at: now,
+        })
+        .eq('id', conversationId);
+
+      if (updateError) throw new Error(updateError.message);
+
+      return mapMessageRow(inserted as MessageRow);
     }
 
     const now = new Date().toISOString();
@@ -273,28 +258,31 @@ export const messageService = {
   subscribeToMessages(
     conversationId: string,
     onUpdate: (messages: ChatMessage[]) => void
-  ): Unsubscribe | (() => void) {
-    const db = getFirebaseDb();
+  ): () => void {
+    const supabase = getSupabase();
 
-    if (db && isFirebaseConfigured()) {
-      const q = query(
-        collection(db, CONVERSATIONS_COLLECTION, conversationId, MESSAGES_SUBCOLLECTION),
-        orderBy('createdAt', 'asc')
-      );
+    if (supabase && isSupabaseConfigured()) {
+      const channel = supabase
+        .channel(`messages:${conversationId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'messages',
+            filter: `conversation_id=eq.${conversationId}`,
+          },
+          () => {
+            messageService.getMessages(conversationId).then(onUpdate).catch(() => {});
+          }
+        )
+        .subscribe();
 
-      return onSnapshot(q, snap => {
-        const messages = snap.docs.map(d => {
-          const data = d.data();
-          return {
-            id: d.id,
-            conversationId,
-            senderId: data.senderId as string,
-            text: data.text as string,
-            createdAt: toIsoString(data.createdAt),
-          };
-        });
-        onUpdate(messages);
-      });
+      messageService.getMessages(conversationId).then(onUpdate).catch(() => {});
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
     }
 
     let active = true;

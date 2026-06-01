@@ -1,19 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import {
-  collection,
-  doc,
-  setDoc,
-  deleteDoc,
-  getDoc,
-  getDocs,
-  query,
-  where,
-  serverTimestamp,
-} from 'firebase/firestore';
-import { getFirebaseDb, isFirebaseConfigured } from '../config/firebase';
+import { getSupabase, isSupabaseConfigured } from '../config/supabase';
 
 const FOLLOWS_KEY = '@social_connect_follows';
-const FOLLOWS_COLLECTION = 'follows';
 
 export interface FollowRecord {
   followerId: string;
@@ -44,18 +32,24 @@ export const followService = {
       throw new Error('You cannot follow yourself.');
     }
 
-    const db = getFirebaseDb();
+    const supabase = getSupabase();
 
-    if (db && isFirebaseConfigured()) {
-      const ref = doc(db, FOLLOWS_COLLECTION, followDocId(followerId, followingId));
-      const existing = await getDoc(ref);
-      if (existing.exists()) return;
+    if (supabase && isSupabaseConfigured()) {
+      const { data: existing } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('id', followDocId(followerId, followingId))
+        .maybeSingle();
 
-      await setDoc(ref, {
-        followerId,
-        followingId,
-        createdAt: serverTimestamp(),
+      if (existing) return;
+
+      const { error } = await supabase.from('follows').insert({
+        id: followDocId(followerId, followingId),
+        follower_id: followerId,
+        following_id: followingId,
       });
+
+      if (error) throw new Error(error.message);
       return;
     }
 
@@ -72,10 +66,15 @@ export const followService = {
   },
 
   async unfollowUser(followerId: string, followingId: string): Promise<void> {
-    const db = getFirebaseDb();
+    const supabase = getSupabase();
 
-    if (db && isFirebaseConfigured()) {
-      await deleteDoc(doc(db, FOLLOWS_COLLECTION, followDocId(followerId, followingId)));
+    if (supabase && isSupabaseConfigured()) {
+      const { error } = await supabase
+        .from('follows')
+        .delete()
+        .eq('id', followDocId(followerId, followingId));
+
+      if (error) throw new Error(error.message);
       return;
     }
 
@@ -86,11 +85,17 @@ export const followService = {
   },
 
   async isFollowing(followerId: string, followingId: string): Promise<boolean> {
-    const db = getFirebaseDb();
+    const supabase = getSupabase();
 
-    if (db && isFirebaseConfigured()) {
-      const snap = await getDoc(doc(db, FOLLOWS_COLLECTION, followDocId(followerId, followingId)));
-      return snap.exists();
+    if (supabase && isSupabaseConfigured()) {
+      const { data, error } = await supabase
+        .from('follows')
+        .select('id')
+        .eq('id', followDocId(followerId, followingId))
+        .maybeSingle();
+
+      if (error) throw new Error(error.message);
+      return data !== null;
     }
 
     const follows = await getLocalFollows();
@@ -98,12 +103,16 @@ export const followService = {
   },
 
   async getFollowingIds(followerId: string): Promise<string[]> {
-    const db = getFirebaseDb();
+    const supabase = getSupabase();
 
-    if (db && isFirebaseConfigured()) {
-      const q = query(collection(db, FOLLOWS_COLLECTION), where('followerId', '==', followerId));
-      const snap = await getDocs(q);
-      return snap.docs.map(d => d.data().followingId as string);
+    if (supabase && isSupabaseConfigured()) {
+      const { data, error } = await supabase
+        .from('follows')
+        .select('following_id')
+        .eq('follower_id', followerId);
+
+      if (error) throw new Error(error.message);
+      return (data ?? []).map(row => row.following_id as string);
     }
 
     const follows = await getLocalFollows();
@@ -111,14 +120,21 @@ export const followService = {
   },
 
   async getFollowStats(userId: string): Promise<FollowStats> {
-    const db = getFirebaseDb();
+    const supabase = getSupabase();
 
-    if (db && isFirebaseConfigured()) {
-      const [followersSnap, followingSnap] = await Promise.all([
-        getDocs(query(collection(db, FOLLOWS_COLLECTION), where('followingId', '==', userId))),
-        getDocs(query(collection(db, FOLLOWS_COLLECTION), where('followerId', '==', userId))),
+    if (supabase && isSupabaseConfigured()) {
+      const [followersRes, followingRes] = await Promise.all([
+        supabase.from('follows').select('id', { count: 'exact', head: true }).eq('following_id', userId),
+        supabase.from('follows').select('id', { count: 'exact', head: true }).eq('follower_id', userId),
       ]);
-      return { followers: followersSnap.size, following: followingSnap.size };
+
+      if (followersRes.error) throw new Error(followersRes.error.message);
+      if (followingRes.error) throw new Error(followingRes.error.message);
+
+      return {
+        followers: followersRes.count ?? 0,
+        following: followingRes.count ?? 0,
+      };
     }
 
     const follows = await getLocalFollows();
