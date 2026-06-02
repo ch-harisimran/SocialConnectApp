@@ -115,6 +115,7 @@ export const mockPostsService = {
       comments: posts[index].comments.filter(c => c.id !== commentId),
     };
     await savePosts(posts);
+    await supabaseSyncService.upsertPost(posts[index]);
     return posts[index];
   },
 

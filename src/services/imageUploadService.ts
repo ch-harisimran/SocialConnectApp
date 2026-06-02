@@ -31,20 +31,26 @@ const uploadToBucket = async (
   const ext = getExtension(localUri);
   const contentType = getContentType(ext);
 
-  const response = await fetch(localUri);
-  const blob = await response.blob();
+  try {
+    const response = await fetch(localUri);
+    const blob = await response.blob();
 
-  const { error } = await supabase.storage.from(bucket).upload(filePath, blob, {
-    contentType,
-    upsert: true,
-  });
+    const { error } = await supabase.storage.from(bucket).upload(filePath, blob, {
+      contentType,
+      upsert: true,
+    });
 
-  if (error) {
-    throw new Error(error.message);
+    if (error) {
+      console.warn('Image upload failed, using local URI:', error.message);
+      return localUri;
+    }
+
+    const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
+    return `${data.publicUrl}?t=${Date.now()}`;
+  } catch (err) {
+    console.warn('Image upload failed, using local URI:', err);
+    return localUri;
   }
-
-  const { data } = supabase.storage.from(bucket).getPublicUrl(filePath);
-  return `${data.publicUrl}?t=${Date.now()}`;
 };
 
 export const imageUploadService = {

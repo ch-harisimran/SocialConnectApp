@@ -10,6 +10,7 @@ import {
   addComment as addCommentThunk,
   deleteComment as deleteCommentThunk,
   deletePost as deletePostThunk,
+  resetPosts,
 } from '../store/slices/postsSlice';
 
 interface PostsContextType {
@@ -29,13 +30,18 @@ const PostsContext = createContext<PostsContextType | undefined>(undefined);
 
 export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const dispatch = useAppDispatch();
+  const userId = useAppSelector(state => state.auth.user?.id);
   const posts = useAppSelector(state => state.posts.posts);
   const isLoading = useAppSelector(state => state.posts.isLoading);
   const isRefreshing = useAppSelector(state => state.posts.isRefreshing);
 
   useEffect(() => {
-    dispatch(fetchPosts());
-  }, [dispatch]);
+    if (userId) {
+      dispatch(fetchPosts());
+    } else {
+      dispatch(resetPosts());
+    }
+  }, [userId, dispatch]);
 
   const refreshPosts = useCallback(async () => {
     await dispatch(refreshPostsThunk());
@@ -63,7 +69,10 @@ export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const toggleLike = useCallback(
     async (postId: string) => {
-      await dispatch(toggleLikeThunk(postId));
+      const result = await dispatch(toggleLikeThunk(postId));
+      if (toggleLikeThunk.rejected.match(result)) {
+        throw new Error(result.error.message ?? 'Failed to update like.');
+      }
     },
     [dispatch]
   );
@@ -80,14 +89,20 @@ export const PostsProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const deleteComment = useCallback(
     async (postId: string, commentId: string) => {
-      await dispatch(deleteCommentThunk({ postId, commentId }));
+      const result = await dispatch(deleteCommentThunk({ postId, commentId }));
+      if (deleteCommentThunk.rejected.match(result)) {
+        throw new Error(result.error.message ?? 'Failed to delete comment.');
+      }
     },
     [dispatch]
   );
 
   const deletePost = useCallback(
     async (postId: string) => {
-      await dispatch(deletePostThunk(postId));
+      const result = await dispatch(deletePostThunk(postId));
+      if (deletePostThunk.rejected.match(result)) {
+        throw new Error(result.error.message ?? 'Failed to delete post.');
+      }
     },
     [dispatch]
   );

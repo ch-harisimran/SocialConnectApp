@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,8 +12,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import type { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { useAuth } from '../../context/AuthContext';
+import { usePosts } from '../../context/PostsContext';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { setNotificationsEnabled, setDarkMode } from '../../store/slices/settingsSlice';
+import { loadProfileFollowState } from '../../store/slices/followsSlice';
 import { notificationService } from '../../services/notificationService';
 import { useTheme } from '../../utils/theme';
 import { rf } from '../../utils/responsive';
@@ -84,11 +86,26 @@ const sectionStyles = StyleSheet.create({
 const SettingsScreen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { user, logout } = useAuth();
+  const { posts } = usePosts();
   const dispatch = useAppDispatch();
   const insets = useSafeAreaInsets();
   const t = useTheme();
   const notificationsEnabled = useAppSelector(s => s.settings.notificationsEnabled);
   const isDarkMode = useAppSelector(s => s.settings.isDarkMode);
+  const followingIds = useAppSelector(s => s.follows.followingIds);
+  const profileState = useAppSelector(s =>
+    user?.id ? s.follows.profileStates[user.id] : undefined
+  );
+
+  useEffect(() => {
+    if (user?.id) {
+      dispatch(loadProfileFollowState(user.id));
+    }
+  }, [dispatch, user?.id]);
+
+  const postCount = posts.filter(p => p.authorId === user?.id).length;
+  const followerCount = profileState?.followers ?? 0;
+  const followingCount = followingIds.length;
 
   const handleLogout = () =>
     Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
@@ -157,9 +174,9 @@ const SettingsScreen: React.FC = () => {
         {/* Mini stats */}
         <View style={styles.heroStats}>
           {[
-            { label: 'Posts', value: '12' },
-            { label: 'Followers', value: '248' },
-            { label: 'Following', value: '91' },
+            { label: 'Posts', value: String(postCount) },
+            { label: 'Followers', value: String(followerCount) },
+            { label: 'Following', value: String(followingCount) },
           ].map((s, i, arr) => (
             <React.Fragment key={s.label}>
               <View style={styles.heroStatItem}>

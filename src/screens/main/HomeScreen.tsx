@@ -419,8 +419,9 @@ const HomeScreen: React.FC = () => {
 
   const handleNewActivityPress = useCallback(() => {
     listRef.current?.scrollToOffset({ offset: 0, animated: true });
+    refreshPosts();
     dispatch(clearNewActivity());
-  }, [dispatch]);
+  }, [dispatch, refreshPosts]);
 
   const initials = user?.name?.slice(0, 2).toUpperCase() ?? 'U';
   const fabSpin = fabRotate.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '45deg'] });

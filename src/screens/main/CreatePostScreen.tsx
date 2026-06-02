@@ -33,7 +33,7 @@ const CreatePostScreen: React.FC = () => {
   const editPostId = route.params?.postId;
   const isEditing = Boolean(editPostId);
 
-  const { posts, createPost, updatePost } = usePosts();
+  const { posts, createPost, updatePost, isLoading: postsLoading } = usePosts();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const t = useTheme();
@@ -45,6 +45,8 @@ const CreatePostScreen: React.FC = () => {
 
   useEffect(() => {
     if (!editPostId) return;
+    if (postsLoading) return;
+
     const post = posts.find(p => p.id === editPostId);
     if (post) {
       setContent(post.content);
@@ -55,7 +57,7 @@ const CreatePostScreen: React.FC = () => {
         { text: 'OK', onPress: () => navigation.goBack() },
       ]);
     }
-  }, [editPostId, posts, navigation, isLoaded]);
+  }, [editPostId, posts, postsLoading, navigation, isLoaded]);
 
   const charsLeft = MAX_CHARS - content.length;
   const hasText = content.trim().length > 0;

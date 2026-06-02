@@ -188,6 +188,14 @@ const postsSlice = createSlice({
     clearNewActivity(state) {
       state.hasNewActivity = false;
     },
+    resetPosts(state) {
+      state.posts = [];
+      state.isLoading = true;
+      state.isRefreshing = false;
+      state.lastSyncedAt = null;
+      state.hasNewActivity = false;
+      state.error = null;
+    },
   },
   extraReducers: builder => {
     builder
@@ -239,5 +247,5 @@ const postsSlice = createSlice({
   },
 });
 
-export const { clearNewActivity } = postsSlice.actions;
+export const { clearNewActivity, resetPosts } = postsSlice.actions;
 export default postsSlice.reducer;

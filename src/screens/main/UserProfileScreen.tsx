@@ -180,6 +180,8 @@ const UserProfileScreen: React.FC = () => {
           otherUserId: userId,
           otherUserName: displayName,
         });
+      } else {
+        Alert.alert('Could not start chat', result.error.message ?? 'Please try again.');
       }
     } finally {
       setIsStartingChat(false);

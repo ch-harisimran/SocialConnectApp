@@ -90,8 +90,11 @@ const ChatScreen: React.FC = () => {
   const handleSend = async () => {
     const trimmed = text.trim();
     if (!trimmed || isSending) return;
-    setText('');
-    await dispatch(sendMessage({ conversationId, text: trimmed }));
+
+    const result = await dispatch(sendMessage({ conversationId, text: trimmed }));
+    if (sendMessage.fulfilled.match(result)) {
+      setText('');
+    }
   };
 
   const initials = otherUserName.slice(0, 2).toUpperCase();
