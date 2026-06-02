@@ -10,6 +10,7 @@ import {
 } from '../store/slices/authSlice';
 import { clearFollowsState, loadFollowingIds } from '../store/slices/followsSlice';
 import { clearMessagesState, loadConversations } from '../store/slices/messagesSlice';
+import { notificationService } from '../services/notificationService';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -35,6 +36,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (user) {
       dispatch(loadFollowingIds());
       dispatch(loadConversations());
+      notificationService.registerPushToken(user.id);
+      notificationService.deliverPendingForUser(user.id);
     } else {
       dispatch(clearFollowsState());
       dispatch(clearMessagesState());

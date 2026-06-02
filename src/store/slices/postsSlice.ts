@@ -31,17 +31,32 @@ const deferSupabaseSync = (posts: Post[]): void => {
   });
 };
 
-export const fetchPosts = createAsyncThunk('posts/fetchPosts', async () => {
+export const fetchPosts = createAsyncThunk('posts/fetchPosts', async (_, { getState }) => {
   const posts = await mockPostsService.fetchPosts();
   deferSupabaseSync(posts);
+
+  const { auth } = getState() as RootState;
+  if (auth.user) {
+    await notificationService.seedActivitySnapshot(auth.user.id, posts);
+  }
+
   return posts;
 });
 
-export const refreshPosts = createAsyncThunk('posts/refreshPosts', async () => {
+export const refreshPosts = createAsyncThunk('posts/refreshPosts', async (_, { getState }) => {
+  const state = getState() as RootState;
+  const previousPosts = state.posts.posts;
   const posts = await mockPostsService.fetchPosts();
+
   InteractionManager.runAfterInteractions(() => {
     supabaseSyncService.syncAllPosts(posts);
   });
+
+  const { auth, settings } = state;
+  if (auth.user && settings.notificationsEnabled) {
+    await notificationService.processAuthorActivity(auth.user.id, previousPosts, posts);
+  }
+
   return posts;
 });
 
@@ -74,10 +89,12 @@ export const toggleLike = createAsyncThunk(
     if (isLiking && post) {
       dispatch(showToast({ icon: '❤️', message: `You liked ${post.authorName}'s post!`, type: 'like' }));
       if (settings.notificationsEnabled) {
-        notificationService.scheduleLocalNotification(
-          '❤️ New Like',
-          `You liked ${post.authorName}'s post`
-        );
+        await notificationService.notifyPostLiked({
+          post,
+          likerId: auth.user.id,
+          likerName: auth.user.name,
+          currentUserId: auth.user.id,
+        });
       }
     }
 
@@ -103,7 +120,13 @@ export const addComment = createAsyncThunk(
       const preview = text.length > 40 ? `${text.slice(0, 40)}…` : text;
       dispatch(showToast({ icon: '💬', message: `Comment posted: "${preview}"`, type: 'comment' }));
       if (settings.notificationsEnabled) {
-        notificationService.scheduleLocalNotification('💬 Comment Posted', `"${preview}"`);
+        await notificationService.notifyPostCommented({
+          post,
+          commenterId: auth.user.id,
+          commenterName: auth.user.name,
+          commentText: text,
+          currentUserId: auth.user.id,
+        });
       }
     }
 

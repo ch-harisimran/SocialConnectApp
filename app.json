@@ -42,6 +42,13 @@
           "photosPermission": "Allow access to your photos to attach images to posts.",
           "cameraPermission": "Allow camera access to take photos for posts."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#6366F1"
+        }
       ]
     ]
   }

@@ -103,6 +103,9 @@ const SettingsScreen: React.FC = () => {
         Alert.alert('Permission Required', 'Enable notifications in your device settings.', [{ text: 'OK' }]);
         return;
       }
+      if (user?.id) {
+        await notificationService.registerPushToken(user.id);
+      }
     }
     dispatch(setNotificationsEnabled(enabled));
   };

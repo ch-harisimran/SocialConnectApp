@@ -13,6 +13,7 @@ import { useAppDispatch, useAppSelector } from './src/store/hooks';
 import { loadSettings } from './src/store/slices/settingsSlice';
 import { notificationService } from './src/services/notificationService';
 import RealtimeSyncManager from './src/components/RealtimeSyncManager';
+import NotificationManager from './src/components/NotificationManager';
 import InAppToast from './src/components/InAppToast';
 
 const AppInitializer: React.FC = () => {
@@ -47,6 +48,7 @@ export default function App() {
         <Provider store={store}>
           <AppInitializer />
           <RealtimeSyncManager />
+          <NotificationManager />
           <AuthProvider>
             <PostsProvider>
               <AppContent />

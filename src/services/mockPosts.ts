@@ -97,6 +97,7 @@ export const mockPostsService = {
     };
     posts[index] = { ...posts[index], comments: [...posts[index].comments, newComment] };
     await savePosts(posts);
+    await supabaseSyncService.upsertPost(posts[index]);
     return posts[index];
   },
 
